@@ -66,6 +66,7 @@ export class EwtInstallDialog extends LitElement {
     | "DASHBOARD"
     | "PROVISION"
     | "INSTALL"
+    | "CONFIGURE"
     | "ASK_ERASE"
     | "LOGS" = "DASHBOARD";
 
@@ -86,6 +87,31 @@ export class EwtInstallDialog extends LitElement {
 
   // Name of Ssid. Null = other
   @state() private _selectedSsid: string | null = null;
+
+  @state() private _currencies: string[] = [];
+
+  private async _fetchCurrencies() {
+    try {
+      const response = await fetch('https://lnbits.opago-pay.com/api/v1/currencies', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      this._currencies = await response.json();
+    } catch (e) {
+      if (e instanceof Error) {
+        console.log("There was an error fetching the currencies: ", e.message);
+      } else {
+        console.log("There was an error fetching the currencies: ", e);
+      }
+    }
+  }
 
   protected render() {
     if (!this.port) {
@@ -120,6 +146,8 @@ export class EwtInstallDialog extends LitElement {
         : this._renderDashboardNoImprov();
     } else if (this._state === "PROVISION") {
       [heading, content, hideActions] = this._renderProvision();
+    } else if (this._state === "CONFIGURE") {
+      [heading, content, hideActions] = this._renderConfigure();
     } else if (this._state === "LOGS") {
       [heading, content, hideActions] = this._renderLogs();
     }
@@ -204,6 +232,14 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
+        <div>
+          <ewt-button
+          label="Configure"
+          @click=${async () => {
+            this._state = "CONFIGURE";
+          }}
+          ></ewt-button>
+        </div>
         ${this._client!.nextUrl === undefined
           ? ""
           : html`
@@ -295,7 +331,7 @@ export class EwtInstallDialog extends LitElement {
     let content: TemplateResult;
     let hideActions = true;
     let allowClosing = true;
-
+  
     content = html`
       <div class="dashboard-buttons">
         <div>
@@ -312,7 +348,14 @@ export class EwtInstallDialog extends LitElement {
             }}
           ></ewt-button>
         </div>
-
+        <div>
+          <ewt-button
+            label="Configure"
+            @click=${async () => {
+              this._state = "CONFIGURE";
+            }}
+          ></ewt-button>
+        </div>
         <div>
           <ewt-button
             label="Logs & Console"
@@ -325,8 +368,171 @@ export class EwtInstallDialog extends LitElement {
         </div>
       </div>
     `;
-
+  
     return [heading, content, hideActions, allowClosing];
+  }
+
+  private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
+    let heading: string | undefined = `Configuration`;
+    let content: TemplateResult;
+    let hideActions = false;
+  
+    // Use this._currencies instead of fetching the currencies
+    let currencies: string[] = this._currencies;
+  
+    content = html`
+      <form id="configurationForm">
+        <div>
+          <label>
+            API Key:
+            <input type="text" name="apiKey.key" value="imL5noxJcQRVtGWTXqh6an" />
+          </label>
+        </div>
+        <div>
+          <label>
+            API Key Encoding:
+            <input type="text" name="apiKey.encoding" value="" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Callback URL:
+            <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/bMyzC" />
+          </label>
+        </div>
+        <div>
+          <label>
+            URI Schema Prefix:
+            <input type="text" name="uriSchemaPrefix" value="" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Fiat Currency:
+            <select id="fiatCurrency" name="fiatCurrency">
+              ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+            </select>
+          </label>
+        </div>
+        <div>
+          <label>
+            Fiat Precision:
+            <input type="text" name="fiatPrecision" value="2" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Locale:
+            <input type="text" name="locale" value="en" />
+          </label>
+        </div>
+        <div>
+          <label>
+            TFT Rotation:
+            <input type="text" name="tftRotation" value="3" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Sleep Mode Delay:
+            <input type="text" name="sleepModeDelay" value="30000" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Battery Max Volts:
+            <input type="text" name="batteryMaxVolts" value="4.2" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Battery Min Volts:
+            <input type="text" name="batteryMinVolts" value="2.5" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Contrast Level:
+            <input type="text" name="contrastLevel" value="60" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Log Level:
+            <input type="text" name="logLevel" value="info" />
+          </label>
+        </div>
+        <div>
+          <label>
+            SPIFFS Formatted:
+            <input type="text" name="spiffsFormatted" value="false" />
+          </label>
+        </div>
+        <div>
+          <label>
+            WiFi SSID:
+            <input type="text" name="wifiSSID" value="" />
+          </label>
+        </div>
+        <div>
+          <label>
+            WiFi Password:
+            <input type="text" name="wifiPwd" value="" />
+          </label>
+        </div>
+      </form>
+      <ewt-button
+        slot="primaryAction"
+        label="Save Configuration"
+        @click=${this._saveConfiguration}
+      ></ewt-button>
+    `;
+  
+    return [heading, content, hideActions];
+  }
+
+  private async _saveConfiguration() {
+    const form = this.shadowRoot?.querySelector('#configurationForm');
+    if (!form) return;
+    const formData = new FormData(form as HTMLFormElement);
+    
+    // Convert formData to JSON
+    let object: any = {};
+    formData.forEach((value, key) => { object[key] = value });
+  
+    // Prepare the data to be sent
+    const data = {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "setconfig",
+      "params": object
+    };
+  
+    // Send the configuration to the ESP32 via JSON-RPC
+    try {
+      if (!this.port || this.port.readable === null || this.port.writable === null) {
+        this.port = await navigator.serial.requestPort();
+        await this.port.open({ baudRate: 115200 });
+      }
+  
+      if (this.port.writable) {
+        const writer = this.port.writable.getWriter();
+        const encoder = new TextEncoder();
+        const dataStr = JSON.stringify(data);
+        console.log("Sending:", dataStr);  // log data before sending
+        const encodedData = encoder.encode(dataStr + "\n"); // add newline character at the end
+        await writer.write(encodedData);
+        writer.releaseLock();
+      } else {
+        console.error('The port is not writable');
+      } 
+  
+      // Output the progress to a console-style window
+      this._state = "LOGS";
+      this.logger.log(`Configuration saved successfully.`);
+    } catch (e) {
+      this.logger.error(`There was an error saving the configuration: ${(e as Error).message}`);
+    }
   }
 
   _renderProvision(): [string | undefined, TemplateResult, boolean] {
@@ -785,21 +991,21 @@ export class EwtInstallDialog extends LitElement {
 
   protected override updated(changedProps: PropertyValues) {
     super.updated(changedProps);
-
+  
     if (changedProps.has("_state")) {
       this.setAttribute("state", this._state);
-    }
-
-    if (this._state !== "PROVISION") {
-      return;
-    }
-
-    if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
-      // If we pick "Join other", select SSID input.
-      this._focusFormElement("ewt-textfield[name=ssid]");
-    } else if (changedProps.has("_ssids")) {
-      // Form is shown when SSIDs are loaded/marked not supported
-      this._focusFormElement();
+  
+      if (this._state === "CONFIGURE") {
+        this._fetchCurrencies();
+      } else if (this._state === "PROVISION") {
+        if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
+          // If we pick "Join other", select SSID input.
+          this._focusFormElement("ewt-textfield[name=ssid]");
+        } else if (changedProps.has("_ssids")) {
+          // Form is shown when SSIDs are loaded/marked not supported
+          this._focusFormElement();
+        }
+      }
     }
   }
 
