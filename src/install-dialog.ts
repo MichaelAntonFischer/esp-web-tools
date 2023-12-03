@@ -381,104 +381,104 @@ export class EwtInstallDialog extends LitElement {
     let currencies: string[] = this._currencies;
   
     content = html`
-      <form id="configurationForm">
-        <div>
-          <label>
-            API Key:
-            <input type="text" name="apiKey.key" value="imL5noxJcQRVtGWTXqh6an" />
-          </label>
+      <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
+        <div style="grid-column: 1;">
+          <label>API Key:</label>
         </div>
-        <div>
-          <label>
-            API Key Encoding:
-            <input type="text" name="apiKey.encoding" value="" />
-          </label>
+        <div style="grid-column: 3;">
+          <input type="text" name="apiKey.key" value="imL5noxJcQRVtGWTXqh6an" />
         </div>
-        <div>
-          <label>
-            Callback URL:
-            <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/bMyzC" />
-          </label>
+        <div style="grid-column: 1;">
+          <label>API Key Encoding:</label>
         </div>
-        <div>
-          <label>
-            URI Schema Prefix:
-            <input type="text" name="uriSchemaPrefix" value="" />
-          </label>
+        <div style="grid-column: 3;">
+          <input type="text" name="apiKey.encoding" value="" />
         </div>
-        <div>
-          <label>
-            Fiat Currency:
-            <select id="fiatCurrency" name="fiatCurrency">
-              ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
-            </select>
-          </label>
+        <div style="grid-column: 1;">
+          <label>Callback URL:</label>
         </div>
-        <div>
-          <label>
-            Fiat Precision:
-            <input type="text" name="fiatPrecision" value="2" />
-          </label>
+        <div style="grid-column: 3;">
+          <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/bMyzC" />
         </div>
-        <div>
-          <label>
-            Locale:
-            <input type="text" name="locale" value="en" />
-          </label>
+        <div style="grid-column: 1;">
+          <label>URI Schema Prefix:</label>
         </div>
-        <div>
-          <label>
-            TFT Rotation:
-            <input type="text" name="tftRotation" value="3" />
-          </label>
+        <div style="grid-column: 3;">
+          <input type="text" name="uriSchemaPrefix" value="" />
         </div>
-        <div>
-          <label>
-            Sleep Mode Delay:
-            <input type="text" name="sleepModeDelay" value="30000" />
-          </label>
+        <div style="grid-column: 1;">
+          <label>Fiat Currency:</label>
         </div>
-        <div>
-          <label>
-            Battery Max Volts:
-            <input type="text" name="batteryMaxVolts" value="4.2" />
-          </label>
+        <div style="grid-column: 3;">
+          <select id="fiatCurrency" name="fiatCurrency">
+            ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+          </select>
         </div>
-        <div>
-          <label>
-            Battery Min Volts:
-            <input type="text" name="batteryMinVolts" value="2.5" />
-          </label>
+        <div style="grid-column: 1;">
+          <label>Fiat Precision:</label>
         </div>
-        <div>
-          <label>
-            Contrast Level:
-            <input type="text" name="contrastLevel" value="60" />
-          </label>
+        <div style="grid-column: 3;">
+          <input type="text" name="fiatPrecision" value="2" />
         </div>
-        <div>
-          <label>
-            Log Level:
-            <input type="text" name="logLevel" value="info" />
-          </label>
+        <div style="grid-column: 1;">
+          <label>Locale:</label>
         </div>
-        <div>
-          <label>
-            SPIFFS Formatted:
-            <input type="text" name="spiffsFormatted" value="false" />
-          </label>
+        <div style="grid-column: 3;">
+          <input type="text" name="locale" value="en" />
         </div>
-        <div>
-          <label>
-            WiFi SSID:
-            <input type="text" name="wifiSSID" value="" />
-          </label>
+        <div style="grid-column: 1;">
+          <label>TFT Rotation:</label>
         </div>
-        <div>
-          <label>
-            WiFi Password:
-            <input type="text" name="wifiPwd" value="" />
-          </label>
+        <div style="grid-column: 3;">
+          <input type="text" name="tftRotation" value="3" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Sleep Mode Delay:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="sleepModeDelay" value="30000" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Battery Max Volts:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="batteryMaxVolts" value="4.2" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Battery Min Volts:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="batteryMinVolts" value="2.5" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Contrast Level:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="contrastLevel" value="60" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Log Level:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="logLevel" value="info" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>SPIFFS Formatted:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="spiffsFormatted" value="false" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>WiFi SSID:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="wifiSSID" value="" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>WiFi Password:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="wifiPwd" value="" />
         </div>
       </form>
       <ewt-button
