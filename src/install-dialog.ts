@@ -137,31 +137,63 @@ export class EwtInstallDialog extends LitElement {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
   
+    // Store the entire configuration objects, not just the ids
     this._existingConfigs = await response.json();
   }
 
   private _handleConfigChange(event: Event) {
     const selectedConfigId = (event.target as HTMLSelectElement).value;
+  
+    // Fetch the selected configuration from the server
     const selectedConfig = this._existingConfigs.find(config => config.id === selectedConfigId);
   
-    if (selectedConfig) {
-      // Update form fields with selected configuration details
-      (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = selectedConfig.key;
-      (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${selectedConfig.id}`;
-      // Hide the currency selector
-      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).value = selectedConfig.currency;
-      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).style.display = 'none';
-    } else {
-      // Show the currency selector
-      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).style.display = 'block';
+    const titleInput = this.shadowRoot!.querySelector('#titleInput') as HTMLInputElement;
+    const titleLabel = this.shadowRoot!.querySelector('#titleLabel') as HTMLDivElement;
+    const currencySelect = this.shadowRoot!.querySelector('#fiatCurrency') as HTMLSelectElement;
+    const currencyLabel = this.shadowRoot!.querySelector('#currencyLabel') as HTMLDivElement;
+  
+    // Check if the elements exist before trying to access their properties
+    if (titleInput && titleLabel && currencySelect && currencyLabel) {
+      // Hide the elements by default
+      titleInput.style.display = 'none';
+      titleLabel.style.display = 'none';
+      currencySelect.style.display = 'none';
+      currencyLabel.style.display = 'none';
+  
+      if (selectedConfigId === 'createNewDevice') {
+        // Show the title and currency fields and labels for creating a new device
+        titleInput.style.display = 'block';
+        titleLabel.style.display = 'block';
+        currencySelect.style.display = 'block';
+        currencyLabel.style.display = 'block';
+      } else if (selectedConfig) {
+        // Set the apiKey.key and callbackUrl in the form fields
+        const apiKeyInput = this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement;
+        const callbackUrlInput = this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement;
+  
+        if (apiKeyInput && callbackUrlInput) {
+          apiKeyInput.value = selectedConfig.apiKey;
+          callbackUrlInput.value = selectedConfig.callbackUrl;
+        }
+      }
     }
   }
   
 
   private async _createNewDevice() {
-    // Ask for title and currency
-    const title = prompt("Please enter the title for the new device:");
-    const currency = prompt("Please enter the currency for the new device:");
+    let title: string = '';
+    let currency: string = '';
+  
+    let titleInput = this.shadowRoot!.querySelector('#titleInput') as HTMLInputElement;
+    let currencySelect = this.shadowRoot!.querySelector('#fiatCurrency') as HTMLSelectElement;
+  
+    if (titleInput && currencySelect) {
+      title = titleInput.value;
+      currency = currencySelect.value;
+    } else {
+      console.error('titleInput or currencySelect element is not available');
+      return;
+    }
   
     const data = {
       "title": title,
@@ -194,15 +226,20 @@ export class EwtInstallDialog extends LitElement {
   
     const newDevice = await response.json();
   
-    // Update form fields with new device details
-    (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = newDevice.key;
-    (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${newDevice.id}`;
-  
-    // If the selected currency is "sat", set the fiat precision to 0
-    if (newDevice.currency === 'sat') {
-      (this.shadowRoot!.querySelector('input[name="fiatPrecision"]') as HTMLInputElement).value = '0';
-    }
+  // Update form fields with new device details
+  let apiKeyInput = this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement;
+  let callbackUrlInput = this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement;
+  let fiatCurrencyInput = this.shadowRoot!.querySelector('input[name="fiatCurrency"]') as HTMLInputElement;
+
+  apiKeyInput.value = newDevice.key;
+  callbackUrlInput.value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${newDevice.id}`;
+  fiatCurrencyInput.value = currency;
+
+  // If the selected currency is "sat", set the fiat precision to 0
+  if (currency === 'sat') {
+    (this.shadowRoot!.querySelector('input[name="fiatPrecision"]') as HTMLInputElement).value = '0';
   }
+}
 
   protected render() {
     if (!this.port) {
@@ -471,153 +508,160 @@ export class EwtInstallDialog extends LitElement {
   
     // Use this._currencies instead of fetching the currencies
     let currencies: string[] = this._currencies;
+
+    // Initialize the "Existing Devices" selector to the "Select a configuration" state
+    let configSelector = this.shadowRoot!.querySelector('select[name="existingConfigs"]') as HTMLSelectElement;
+    if (configSelector) {
+      let event = new Event('change');
+      Object.defineProperty(event, 'target', { 
+        writable: false, 
+        value: configSelector 
+      });
+      this._handleConfigChange(event);
+    } 
   
     content = html`
-      <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
+    <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
+      <div style="grid-column: 1;">
+        <label>Expert Mode:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <input type="checkbox" id="expertMode" name="expertMode" @change=${this._toggleExpertMode} />
+      </div>
+      ${this._expertMode ? html`
         <div style="grid-column: 1;">
-          <label>Expert Mode:</label>
+          <label>API Key:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="checkbox" id="expertMode" name="expertMode" @change=${this._toggleExpertMode} />
+          <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
         </div>
-        ${this._expertMode ? html`
-          <div style="grid-column: 1;">
-            <label>API Key:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>API Key Encoding:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="apiKey.encoding" value="" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>Callback URL:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>URI Schema Prefix:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="uriSchemaPrefix" value="" />
-          </div>
-        ` : html`
-          <div style="grid-column: 1;">
-            <label>Existing Configurations:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <select name="existingConfigs" @change=${this._handleConfigChange}>
-              <option value="">Select a configuration</option>
-              ${this._existingConfigs.map(config => html`
-                <option value="${config.id}">${config.title}</option>
-              `)}
-            </select>
-          </div>
-          <ewt-button
-            slot="primaryAction"
-            label="Create New Device"
-            @click=${this._createNewDevice}
-          ></ewt-button>
-          <input type="hidden" name="apiKey.encoding" value="" />
-          <input type="hidden" name="uriSchemaPrefix" value="" />
-        `}
         <div style="grid-column: 1;">
-          <label>Fiat Currency:</label>
+          <label>API Key Encoding:</label>
         </div>
         <div style="grid-column: 3;">
-          <select id="fiatCurrency" name="fiatCurrency">
-            ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+          <input type="text" name="apiKey.encoding" value="" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Callback URL:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>URI Schema Prefix:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="uriSchemaPrefix" value="" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Fiat Precision:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="fiatPrecision" value="2" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Locale:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="locale" value="en" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>TFT Rotation:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="tftRotation" value="3" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Sleep Mode Delay:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="sleepModeDelay" value="600000" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Battery Max Volts:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="batteryMaxVolts" value="3.7" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Battery Min Volts:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="batteryMinVolts" value="2.1" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Contrast Level:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="contrastLevel" value="75" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>Log Level:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="logLevel" value="info" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>SPIFFS Formatted:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="spiffsFormatted" value="false" />
+        </div>
+      ` : html`
+        <div style="grid-column: 1;">
+          <label>Existing Devices:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <select name="existingConfigs" @change=${this._handleConfigChange}>
+            <option value="">Select a configuration</option>
+            ${this._existingConfigs.map(config => html`
+              <option value="${config.id}">${config.title}</option>
+            `)}
+            <option value="createNewDevice">Create New Device</option>
           </select>
         </div>
-        ${this._expertMode ? html`
-          <div style="grid-column: 1;">
-            <label>Fiat Precision:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="fiatPrecision" value="2" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>Locale:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="locale" value="en" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>TFT Rotation:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="tftRotation" value="3" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>Sleep Mode Delay:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="sleepModeDelay" value="600000" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>Battery Max Volts:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="batteryMaxVolts" value="3.7" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>Battery Min Volts:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="batteryMinVolts" value="2.1" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>Contrast Level:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="contrastLevel" value="75" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>Log Level:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="logLevel" value="info" />
-          </div>
-          <div style="grid-column: 1;">
-            <label>SPIFFS Formatted:</label>
-          </div>
-          <div style="grid-column: 3;">
-            <input type="text" name="spiffsFormatted" value="false" />
-          </div>
-        ` : html`
-          <input type="hidden" name="fiatPrecision" value="2" />
-          <input type="hidden" name="locale" value="en" />
-          <input type="hidden" name="tftRotation" value="3" />
-          <input type="hidden" name="sleepModeDelay" value="600000" />
-          <input type="hidden" name="batteryMaxVolts" value="3.7" />
-          <input type="hidden" name="batteryMinVolts" value="2.1" />
-          <input type="hidden" name="contrastLevel" value="75" />
-          <input type="hidden" name="logLevel" value="info" />
-          <input type="hidden" name="spiffsFormatted" value="false" />
-        `}
-        <div style="grid-column: 1;">
-          <label>WiFi SSID:</label>
-        </div>
+        <div style="grid-column: 1;" id="titleLabel" style="display: none;">
+        <label>Title:</label>
+      </div>
         <div style="grid-column: 3;">
-          <input type="text" name="wifiSSID" value="" />
+          <input type="text" name="title" id="titleInput" style="display: none;" />
         </div>
-        <div style="grid-column: 1;">
-          <label>WiFi Password:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="wifiPwd" value="" />
-        </div>
-      </form>
-      <ewt-button
-        slot="primaryAction"
-        label="Save Configuration"
-        @click=${this._saveConfiguration}
-      ></ewt-button>
-    `;
+        <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
+        <label>Fiat Currency:</label>
+      <div style="grid-column: 3;">
+      <select id="fiatCurrency" name="fiatCurrency" style="display: none; grid-column: 3;">
+        ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+      </select>
+      </div>
+        <input type="hidden" name="apiKey.encoding" value="" />
+        <input type="hidden" name="uriSchemaPrefix" value="" />
+      `}
+      <div style="grid-column: 1;">
+        <label>WiFi SSID:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <input type="text" name="wifiSSID" value="" />
+      </div>
+      <div style="grid-column: 1;">
+        <label>WiFi Password:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <input type="text" name="wifiPwd" value="" />
+      </div>
+      <input type="hidden" name="tftRotation" value="3" />
+      <input type="hidden" name="sleepModeDelay" value="600000" />
+      <input type="hidden" name="batteryMaxVolts" value="3.7" />
+      <input type="hidden" name="batteryMinVolts" value="2.1" />
+      <input type="hidden" name="contrastLevel" value="75" />
+      <input type="hidden" name="logLevel" value="info" />
+      <input type="hidden" name="spiffsFormatted" value="false" />
+    </form>
+    <ewt-button
+      slot="primaryAction"
+      label="Save Configuration"
+      @click=${this._saveConfiguration}
+    ></ewt-button>
+  `;           
   
     return [heading, content, hideActions];
   }
@@ -630,11 +674,32 @@ export class EwtInstallDialog extends LitElement {
   private async _saveConfiguration() {
     const form = this.shadowRoot?.querySelector('#configurationForm');
     if (!form) return;
-    const formData = new FormData(form as HTMLFormElement);
-    
+    let formData = new FormData(form as HTMLFormElement);
+  
     // Convert formData to JSON
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
+  
+    // Remove the "expertMode" field
+    delete object.expertMode;
+  
+    if (object.existingConfigs === 'createNewDevice') {
+      await this._createNewDevice();
+  
+      // Fetch the form data again after _createNewDevice
+      formData = new FormData(form as HTMLFormElement);
+      object = {};
+      formData.forEach((value, key) => { object[key] = value });
+    }
+  
+    // Check if "Create New Device" is selected
+    if (object.existingConfigs === 'createNewDevice') {
+      await this._createNewDevice();
+  
+      // Replace the apiKey and callbackUrl in the form data with the ones from the component's state
+      object['apiKey.key'] = (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value;
+      object['callbackUrl'] = (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value;
+    }
   
     // Prepare the data to be sent
     const data = {
