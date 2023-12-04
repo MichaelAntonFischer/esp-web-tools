@@ -143,21 +143,25 @@ export class EwtInstallDialog extends LitElement {
   private _handleConfigChange(event: Event) {
     const selectedConfigId = (event.target as HTMLSelectElement).value;
     const selectedConfig = this._existingConfigs.find(config => config.id === selectedConfigId);
-    
+  
     if (selectedConfig) {
+      // Update form fields with selected configuration details
       (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = selectedConfig.key;
       (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${selectedConfig.id}`;
+      // Hide the currency selector
       (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).value = selectedConfig.currency;
+      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).style.display = 'none';
     } else {
-      (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = '';
-      (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = '';
-      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).value = '';
+      // Show the currency selector
+      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).style.display = 'block';
     }
   }
+  
 
   private async _createNewDevice() {
-    const title = (this.shadowRoot!.querySelector('input[name="title"]') as HTMLInputElement).value;
-    const currency = (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).value;
+    // Ask for title and currency
+    const title = prompt("Please enter the title for the new device:");
+    const currency = prompt("Please enter the currency for the new device:");
   
     const data = {
       "title": title,
@@ -193,6 +197,11 @@ export class EwtInstallDialog extends LitElement {
     // Update form fields with new device details
     (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = newDevice.key;
     (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${newDevice.id}`;
+  
+    // If the selected currency is "sat", set the fiat precision to 0
+    if (newDevice.currency === 'sat') {
+      (this.shadowRoot!.querySelector('input[name="fiatPrecision"]') as HTMLInputElement).value = '0';
+    }
   }
 
   protected render() {
