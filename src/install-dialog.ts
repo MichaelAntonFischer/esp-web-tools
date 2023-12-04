@@ -47,6 +47,8 @@ export class EwtInstallDialog extends LitElement {
 
   public logger: Logger = console;
 
+  private _expertMode: boolean = false;
+
   public overrides?: {
     checkSameFirmware?: (
       manifest: Manifest,
@@ -103,7 +105,8 @@ export class EwtInstallDialog extends LitElement {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
   
-      this._currencies = await response.json();
+      const fetchedCurrencies = await response.json();
+      this._currencies = ['EUR', 'USD', 'CHF', ...fetchedCurrencies];
     } catch (e) {
       if (e instanceof Error) {
         console.log("There was an error fetching the currencies: ", e.message);
@@ -383,29 +386,37 @@ export class EwtInstallDialog extends LitElement {
     content = html`
       <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
         <div style="grid-column: 1;">
-          <label>API Key:</label>
+          <label>Expert Mode:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="apiKey.key" value="imL5noxJcQRVtGWTXqh6an" />
+          <input type="checkbox" id="expertMode" name="expertMode" @change=${this._toggleExpertMode} />
         </div>
-        <div style="grid-column: 1;">
-          <label>API Key Encoding:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="apiKey.encoding" value="" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Callback URL:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/bMyzC" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>URI Schema Prefix:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="uriSchemaPrefix" value="" />
-        </div>
+        ${this._expertMode ? html`
+          <div style="grid-column: 1;">
+            <label>API Key:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>API Key Encoding:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="apiKey.encoding" value="" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Callback URL:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>URI Schema Prefix:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="uriSchemaPrefix" value="" />
+          </div>
+        ` : ''}
         <div style="grid-column: 1;">
           <label>Fiat Currency:</label>
         </div>
@@ -414,60 +425,62 @@ export class EwtInstallDialog extends LitElement {
             ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
           </select>
         </div>
-        <div style="grid-column: 1;">
-          <label>Fiat Precision:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="fiatPrecision" value="2" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Locale:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="locale" value="en" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>TFT Rotation:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="tftRotation" value="3" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Sleep Mode Delay:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="sleepModeDelay" value="30000" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Battery Max Volts:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="batteryMaxVolts" value="4.2" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Battery Min Volts:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="batteryMinVolts" value="2.5" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Contrast Level:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="contrastLevel" value="60" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Log Level:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="logLevel" value="info" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>SPIFFS Formatted:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="spiffsFormatted" value="false" />
-        </div>
+        ${this._expertMode ? html`
+          <div style="grid-column: 1;">
+            <label>Fiat Precision:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="fiatPrecision" value="2" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Locale:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="locale" value="en" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>TFT Rotation:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="tftRotation" value="3" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Sleep Mode Delay:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="sleepModeDelay" value="600000" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Battery Max Volts:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="batteryMaxVolts" value="3.7" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Battery Min Volts:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="batteryMinVolts" value="2.1" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Contrast Level:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="contrastLevel" value="60" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Log Level:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="logLevel" value="info" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>SPIFFS Formatted:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="spiffsFormatted" value="false" />
+          </div>
+        ` : ''}
         <div style="grid-column: 1;">
           <label>WiFi SSID:</label>
         </div>
@@ -489,6 +502,11 @@ export class EwtInstallDialog extends LitElement {
     `;
   
     return [heading, content, hideActions];
+  }
+
+  private _toggleExpertMode() {
+    this._expertMode = !this._expertMode;
+    this.requestUpdate(); // This is needed to re-render the component
   }
 
   private async _saveConfiguration() {
