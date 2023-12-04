@@ -707,6 +707,10 @@ export class EwtInstallDialog extends LitElement {
       object['apiKey.key'] = (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value;
       object['callbackUrl'] = (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value;
     }
+
+    if (object['fiatCurrency'] === 'sat') {
+      object['fiatPrecision'] = '0';
+    }
   
     // Prepare the data to be sent
     const data = {
