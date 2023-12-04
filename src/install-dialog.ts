@@ -226,20 +226,14 @@ export class EwtInstallDialog extends LitElement {
   
     const newDevice = await response.json();
   
-  // Update form fields with new device details
-  let apiKeyInput = this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement;
-  let callbackUrlInput = this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement;
-  let fiatCurrencyInput = this.shadowRoot!.querySelector('input[name="fiatCurrency"]') as HTMLInputElement;
-
-  apiKeyInput.value = newDevice.key;
-  callbackUrlInput.value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${newDevice.id}`;
-  fiatCurrencyInput.value = currency;
-
-  // If the selected currency is "sat", set the fiat precision to 0
-  if (currency === 'sat') {
-    (this.shadowRoot!.querySelector('input[name="fiatPrecision"]') as HTMLInputElement).value = '0';
-  }
+  // Once the new device is created, return an object with the necessary properties
+  return {
+    apiKey: newDevice.apiKey, // replace 'apiKey' with the actual property name for the API key in the newDevice object
+    callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    fiatCurrency: newDevice.fiatCurrency // replace 'currency' with the actual property name for the currency in the newDevice object
+  };
 }
+
 
   protected render() {
     if (!this.port) {
@@ -701,11 +695,17 @@ export class EwtInstallDialog extends LitElement {
   
     // Check if "Create New Device" is selected
     if (object.existingConfigs === 'createNewDevice') {
-      await this._createNewDevice();
+      // Here we should call _createNewDevice method and update the form data accordingly
+      const newDevice = await this._createNewDevice();
   
-      // Replace the apiKey and callbackUrl in the form data with the ones from the component's state
-      object['apiKey.key'] = (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value;
-      object['callbackUrl'] = (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value;
+      if (newDevice) {
+        object['apiKey.key'] = newDevice.apiKey;
+        object['callbackUrl'] = newDevice.callbackUrl;
+        object['fiatCurrency'] = newDevice.fiatCurrency;
+  
+        // Remove the "existingConfigs" field
+        delete object.existingConfigs;
+      }
     }
 
     if (object['fiatCurrency'] === 'sat') {
