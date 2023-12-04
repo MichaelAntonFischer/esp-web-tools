@@ -648,6 +648,8 @@ export class EwtInstallDialog extends LitElement {
       <div style="grid-column: 3;">
         <input type="text" name="wifiPwd" value="" />
       </div>
+      <input type="hidden" name="fiatPrecision" value="2" />
+      <input type="hidden" name="locale" value="en" />
       <input type="hidden" name="tftRotation" value="3" />
       <input type="hidden" name="sleepModeDelay" value="600000" />
       <input type="hidden" name="batteryMaxVolts" value="3.7" />
@@ -674,22 +676,27 @@ export class EwtInstallDialog extends LitElement {
   private async _saveConfiguration() {
     const form = this.shadowRoot?.querySelector('#configurationForm');
     if (!form) return;
-    let formData = new FormData(form as HTMLFormElement);
+    const formData = new FormData(form as HTMLFormElement);
   
-    // Convert formData to JSON
+    // Convert formData to an object
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
   
-    // Remove the "expertMode" field
-    delete object.expertMode;
-  
-    if (object.existingConfigs === 'createNewDevice') {
-      await this._createNewDevice();
-  
-      // Fetch the form data again after _createNewDevice
-      formData = new FormData(form as HTMLFormElement);
-      object = {};
-      formData.forEach((value, key) => { object[key] = value });
+    // Check if an existing configuration is selected
+    if (object.existingConfigs !== 'createNewDevice') {
+      // Find the selected configuration
+      const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
+
+      if (selectedConfig) {
+        // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
+        object['apiKey.key'] = selectedConfig.key;
+        object['callbackUrl'] = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${selectedConfig.id}`;
+        object['fiatCurrency'] = selectedConfig.currency;
+
+        // Remove the "existingConfigs" and "title" field
+        delete object.existingConfigs;
+        delete object.title;
+      }
     }
   
     // Check if "Create New Device" is selected
