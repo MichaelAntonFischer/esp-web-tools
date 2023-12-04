@@ -108,10 +108,12 @@ export class EwtInstallDialog extends LitElement {
       const fetchedCurrencies = await response.json();
       this._currencies = ['EUR', 'USD', 'CHF', ...fetchedCurrencies];
     } catch (e) {
+      // If there is an error fetching the currencies, we still show EUR, USD and CHF
+      this._currencies = ['EUR', 'USD', 'CHF'];
       if (e instanceof Error) {
-        console.log("There was an error fetching the currencies: ", e.message);
+        this.logger.error("There was an error fetching the currencies: ", e.message);
       } else {
-        console.log("There was an error fetching the currencies: ", e);
+        this.logger.error("There was an error fetching the currencies: ", e);
       }
     }
   }
@@ -416,7 +418,12 @@ export class EwtInstallDialog extends LitElement {
           <div style="grid-column: 3;">
             <input type="text" name="uriSchemaPrefix" value="" />
           </div>
-        ` : ''}
+        ` : html`
+          <input type="hidden" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
+          <input type="hidden" name="apiKey.encoding" value="" />
+          <input type="hidden" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
+          <input type="hidden" name="uriSchemaPrefix" value="" />
+        `}
         <div style="grid-column: 1;">
           <label>Fiat Currency:</label>
         </div>
@@ -480,7 +487,17 @@ export class EwtInstallDialog extends LitElement {
           <div style="grid-column: 3;">
             <input type="text" name="spiffsFormatted" value="false" />
           </div>
-        ` : ''}
+        ` : html`
+          <input type="hidden" name="fiatPrecision" value="2" />
+          <input type="hidden" name="locale" value="en" />
+          <input type="hidden" name="tftRotation" value="3" />
+          <input type="hidden" name="sleepModeDelay" value="600000" />
+          <input type="hidden" name="batteryMaxVolts" value="3.7" />
+          <input type="hidden" name="batteryMinVolts" value="2.1" />
+          <input type="hidden" name="contrastLevel" value="60" />
+          <input type="hidden" name="logLevel" value="info" />
+          <input type="hidden" name="spiffsFormatted" value="false" />
+        `}
         <div style="grid-column: 1;">
           <label>WiFi SSID:</label>
         </div>
