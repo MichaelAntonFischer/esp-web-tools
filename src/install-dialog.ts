@@ -92,31 +92,36 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _currencies: string[] = [];
 
+  // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
-    try {
-      const response = await fetch('https://lnbits.opago-pay.com/api/v1/currencies', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const fetchedCurrencies = await response.json();
-      this._currencies = ['EUR', 'USD', 'CHF', ...fetchedCurrencies];
-    } catch (e) {
-      // If there is an error fetching the currencies, we still show EUR, USD and CHF
-      this._currencies = ['EUR', 'USD', 'CHF'];
-      if (e instanceof Error) {
-        this.logger.error("There was an error fetching the currencies: ", e.message);
-      } else {
-        this.logger.error("There was an error fetching the currencies: ", e);
-      }
-    }
+    this._currencies = ['EUR', 'USD', 'CHF', "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
   }
+  // Fetching currencies from server is currently disabled
+  // private async _fetchCurrencies() {
+  //   try {
+  //     const response = await fetch('https://lnbits.opago-pay.com/api/v1/currencies', {
+  //       method: 'GET',
+  //       headers: {
+  //         'Accept': 'application/json',
+  //       },
+  //     });
+  // 
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+  // 
+  //     const fetchedCurrencies = await response.json();
+  //     this._currencies = ['EUR', 'USD', 'CHF', ...fetchedCurrencies];
+  //   } catch (e) {
+  //     // If there is an error fetching the currencies, we still show EUR, USD and CHF
+  //     this._currencies = ['EUR', 'USD', 'CHF'];
+  //     if (e instanceof Error) {
+  //       this.logger.error("There was an error fetching the currencies: ", e.message);
+  //     } else {
+  //       this.logger.error("There was an error fetching the currencies: ", e);
+  //     }
+  //   }
+  // }
 
   protected render() {
     if (!this.port) {
@@ -1110,37 +1115,41 @@ export class EwtInstallDialog extends LitElement {
     this._installConfirmed = false;
   }
 
-  private async _confirmInstall() {
+  private _confirmInstall() {
     this._installConfirmed = true;
     this._installState = undefined;
     if (this._client) {
-      await this._closeClientWithoutEvents(this._client);
+      this._closeClientWithoutEvents(this._client);
     }
     this._client = undefined;
-
+  
     // Close port. ESPLoader likes opening it.
-    await this.port.close();
-    flash(
-      (state) => {
-        this._installState = state;
-
-        if (state.state === FlashStateType.FINISHED) {
-          sleep(100)
-            // Flashing closes the port
-            .then(() => this.port.open({ baudRate: 115200 }))
-            .then(() => this._initialize(true))
-            .then(() => this.requestUpdate());
-        } else if (state.state === FlashStateType.ERROR) {
-          sleep(100)
-            // Flashing closes the port
-            .then(() => this.port.open({ baudRate: 115200 }));
-        }
-      },
-      this.port,
-      this.manifestPath,
-      this._manifest,
-      this._installErase,
-    );
+    this.port.close().then(() => {
+      flash(
+        (state) => {
+          this._installState = state;
+  
+          if (state.state === FlashStateType.FINISHED) {
+            sleep(100)
+              // Flashing closes the port
+              .then(() => this.port.open({ baudRate: 115200 }))
+              .then(() => this._initialize(true))
+              .then(() => {
+                this._state = "CONFIGURE"; // Change state to CONFIGURE after installation
+                this.requestUpdate();
+              });
+          } else if (state.state === FlashStateType.ERROR) {
+            sleep(100)
+              // Flashing closes the port
+              .then(() => this.port.open({ baudRate: 115200 }));
+          }
+        },
+        this.port,
+        this.manifestPath,
+        this._manifest,
+        this._installErase,
+      );
+    });
     // YOLO2
   }
 
