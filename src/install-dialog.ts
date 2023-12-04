@@ -92,9 +92,11 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _currencies: string[] = [];
 
+  @state() private _existingConfigs: any[] = [];
+
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
-    this._currencies = ['EUR', 'USD', 'CHF', "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
+    this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
   }
   // Fetching currencies from server is currently disabled
   // private async _fetchCurrencies() {
@@ -122,6 +124,76 @@ export class EwtInstallDialog extends LitElement {
   //     }
   //   }
   // }
+
+  private async _fetchConfigs() {
+    const response = await fetch('https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=58e1397eefb54ace8d42532d7e520cb8', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+  
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+  
+    this._existingConfigs = await response.json();
+  }
+
+  private _handleConfigChange(event: Event) {
+    const selectedConfigId = (event.target as HTMLSelectElement).value;
+    const selectedConfig = this._existingConfigs.find(config => config.id === selectedConfigId);
+    
+    if (selectedConfig) {
+      (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = selectedConfig.key;
+      (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${selectedConfig.id}`;
+      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).value = selectedConfig.currency;
+    } else {
+      (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = '';
+      (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = '';
+      (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).value = '';
+    }
+  }
+
+  private async _createNewDevice() {
+    const title = (this.shadowRoot!.querySelector('input[name="title"]') as HTMLInputElement).value;
+    const currency = (this.shadowRoot!.querySelector('select[name="currency"]') as HTMLSelectElement).value;
+  
+    const data = {
+      "title": title,
+      "wallet": "ed8acf51b42a4212b00906681ebd194b",
+      "currency": currency,
+      "device": "pos",
+      "profit": 0,
+      "switches": [
+        {
+          "amount": 0,
+          "duration": 0,
+          "pin": 0,
+          "lnurl": ""
+        }
+      ]
+    };
+  
+    const response = await fetch('https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=529201a89fce404585afcb884e91a505', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+  
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+  
+    const newDevice = await response.json();
+  
+    // Update form fields with new device details
+    (this.shadowRoot!.querySelector('input[name="apiKey.key"]') as HTMLInputElement).value = newDevice.key;
+    (this.shadowRoot!.querySelector('input[name="callbackUrl"]') as HTMLInputElement).value = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${newDevice.id}`;
+  }
 
   protected render() {
     if (!this.port) {
@@ -383,6 +455,7 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
+    this._fetchConfigs();
     let heading: string | undefined = `Configuration`;
     let content: TemplateResult;
     let hideActions = false;
@@ -424,9 +497,23 @@ export class EwtInstallDialog extends LitElement {
             <input type="text" name="uriSchemaPrefix" value="" />
           </div>
         ` : html`
-          <input type="hidden" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
+          <div style="grid-column: 1;">
+            <label>Existing Configurations:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <select name="existingConfigs" @change=${this._handleConfigChange}>
+              <option value="">Select a configuration</option>
+              ${this._existingConfigs.map(config => html`
+                <option value="${config.id}">${config.title}</option>
+              `)}
+            </select>
+          </div>
+          <ewt-button
+            slot="primaryAction"
+            label="Create New Device"
+            @click=${this._createNewDevice}
+          ></ewt-button>
           <input type="hidden" name="apiKey.encoding" value="" />
-          <input type="hidden" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
           <input type="hidden" name="uriSchemaPrefix" value="" />
         `}
         <div style="grid-column: 1;">
@@ -478,7 +565,7 @@ export class EwtInstallDialog extends LitElement {
             <label>Contrast Level:</label>
           </div>
           <div style="grid-column: 3;">
-            <input type="text" name="contrastLevel" value="60" />
+            <input type="text" name="contrastLevel" value="75" />
           </div>
           <div style="grid-column: 1;">
             <label>Log Level:</label>
@@ -499,7 +586,7 @@ export class EwtInstallDialog extends LitElement {
           <input type="hidden" name="sleepModeDelay" value="600000" />
           <input type="hidden" name="batteryMaxVolts" value="3.7" />
           <input type="hidden" name="batteryMinVolts" value="2.1" />
-          <input type="hidden" name="contrastLevel" value="60" />
+          <input type="hidden" name="contrastLevel" value="75" />
           <input type="hidden" name="logLevel" value="info" />
           <input type="hidden" name="spiffsFormatted" value="false" />
         `}
