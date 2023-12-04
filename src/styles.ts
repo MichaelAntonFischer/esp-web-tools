@@ -32,4 +32,8 @@ export const dialogStyles = css`
   a.button {
     text-decoration: none;
   }
+
+  input[type="checkbox"]:checked {
+    background-color: var(--mdc-theme-primary);
+  }
 `;
