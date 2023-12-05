@@ -229,7 +229,7 @@ export class EwtInstallDialog extends LitElement {
   // Once the new device is created, return an object with the necessary properties
   return {
     apiKey: newDevice.apiKey, // replace 'apiKey' with the actual property name for the API key in the newDevice object
-    callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
     fiatCurrency: newDevice.fiatCurrency // replace 'currency' with the actual property name for the currency in the newDevice object
   };
 }
@@ -684,7 +684,7 @@ export class EwtInstallDialog extends LitElement {
       if (selectedConfig) {
         // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
         object['apiKey.key'] = selectedConfig.key;
-        object['callbackUrl'] = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos/${selectedConfig.id}`;
+        object['callbackUrl'] = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
         object['fiatCurrency'] = selectedConfig.currency;
 
         // Remove the "existingConfigs" and "title" field
