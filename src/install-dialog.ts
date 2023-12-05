@@ -225,12 +225,14 @@ export class EwtInstallDialog extends LitElement {
     }
   
     const newDevice = await response.json();
+
+    // Log the newDevice object to the console
+    console.log(newDevice);
   
   // Once the new device is created, return an object with the necessary properties
   return {
-    apiKey: newDevice.apiKey, // replace 'apiKey' with the actual property name for the API key in the newDevice object
+    apiKey: newDevice.key, // replace 'apiKey' with the actual property name for the API key in the newDevice object
     callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
-    fiatCurrency: newDevice.fiatCurrency // replace 'currency' with the actual property name for the currency in the newDevice object
   };
 }
 
@@ -601,6 +603,14 @@ export class EwtInstallDialog extends LitElement {
         <div style="grid-column: 3;">
           <input type="text" name="spiffsFormatted" value="false" />
         </div>
+        <div style="grid-column: 1;">
+          <label>Fiat Currency:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <select id="fiatCurrency" name="fiatCurrency">
+            ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+          </select>
+        </div>
       ` : html`
         <div style="grid-column: 1;">
           <label>Existing Devices:</label>
@@ -622,10 +632,11 @@ export class EwtInstallDialog extends LitElement {
         </div>
         <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
         <label>Fiat Currency:</label>
+      </div>
       <div style="grid-column: 3;">
-      <select id="fiatCurrency" name="fiatCurrency" style="display: none; grid-column: 3;">
-        ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
-      </select>
+        <select id="fiatCurrency" name="fiatCurrency" style="display: none;">
+          ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+        </select>
       </div>
         <input type="hidden" name="apiKey.encoding" value="" />
         <input type="hidden" name="uriSchemaPrefix" value="" />
@@ -657,7 +668,7 @@ export class EwtInstallDialog extends LitElement {
       label="Save Configuration"
       @click=${this._saveConfiguration}
     ></ewt-button>
-  `;           
+  `;
   
     return [heading, content, hideActions];
   }
@@ -697,14 +708,14 @@ export class EwtInstallDialog extends LitElement {
     if (object.existingConfigs === 'createNewDevice') {
       // Here we should call _createNewDevice method and update the form data accordingly
       const newDevice = await this._createNewDevice();
-  
+      
       if (newDevice) {
         object['apiKey.key'] = newDevice.apiKey;
         object['callbackUrl'] = newDevice.callbackUrl;
-        object['fiatCurrency'] = newDevice.fiatCurrency;
-  
-        // Remove the "existingConfigs" field
+      
+        // Remove the "existingConfigs" and "title" field
         delete object.existingConfigs;
+        delete object.title;
       }
     }
 
