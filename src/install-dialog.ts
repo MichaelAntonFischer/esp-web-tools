@@ -126,7 +126,7 @@ export class EwtInstallDialog extends LitElement {
   // }
 
   private async _fetchConfigs() {
-    const response = await fetch('https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=58e1397eefb54ace8d42532d7e520cb8', {
+    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key={{api_key}}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -197,7 +197,7 @@ export class EwtInstallDialog extends LitElement {
   
     const data = {
       "title": title,
-      "wallet": "ed8acf51b42a4212b00906681ebd194b",
+      "wallet": "{{wallet}}",
       "currency": currency,
       "device": "pos",
       "profit": 0,
@@ -211,7 +211,7 @@ export class EwtInstallDialog extends LitElement {
       ]
     };
   
-    const response = await fetch('https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=529201a89fce404585afcb884e91a505', {
+    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key={{api_key}}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
