@@ -40,6 +40,9 @@ console.log(
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
+const api_key = document.body.dataset.apiKey;
+const wallet = document.body.dataset.wallet;
+
 export class EwtInstallDialog extends LitElement {
   public port!: SerialPort;
 
@@ -126,7 +129,7 @@ export class EwtInstallDialog extends LitElement {
   // }
 
   private async _fetchConfigs() {
-    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key={{api_key}}`, {
+    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -197,7 +200,7 @@ export class EwtInstallDialog extends LitElement {
   
     const data = {
       "title": title,
-      "wallet": "{{wallet}}",
+      "wallet": wallet,
       "currency": currency,
       "device": "pos",
       "profit": 0,
@@ -211,7 +214,7 @@ export class EwtInstallDialog extends LitElement {
       ]
     };
   
-    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key={{api_key}}`, {
+    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
