@@ -129,7 +129,7 @@ export class EwtInstallDialog extends LitElement {
   // }
 
   private async _fetchConfigs() {
-    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -214,7 +214,7 @@ export class EwtInstallDialog extends LitElement {
       ]
     };
   
-    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -235,7 +235,7 @@ export class EwtInstallDialog extends LitElement {
   // Once the new device is created, return an object with the necessary properties
   return {
     apiKey: newDevice.key, // replace 'apiKey' with the actual property name for the API key in the newDevice object
-    callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    callbackUrl: `https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
   };
 }
 
@@ -535,22 +535,10 @@ export class EwtInstallDialog extends LitElement {
           <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
         </div>
         <div style="grid-column: 1;">
-          <label>API Key Encoding:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="apiKey.encoding" value="" />
-        </div>
-        <div style="grid-column: 1;">
           <label>Callback URL:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>URI Schema Prefix:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="uriSchemaPrefix" value="" />
         </div>
         <div style="grid-column: 1;">
           <label>Fiat Precision:</label>
@@ -559,34 +547,16 @@ export class EwtInstallDialog extends LitElement {
           <input type="text" name="fiatPrecision" value="2" />
         </div>
         <div style="grid-column: 1;">
-          <label>Locale:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="locale" value="en" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>TFT Rotation:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="tftRotation" value="3" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Sleep Mode Delay:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="sleepModeDelay" value="600000" />
-        </div>
-        <div style="grid-column: 1;">
           <label>Battery Max Volts:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="batteryMaxVolts" value="3.7" />
+          <input type="text" name="batteryMaxVolts" value="4.2" />
         </div>
         <div style="grid-column: 1;">
           <label>Battery Min Volts:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="batteryMinVolts" value="2.1" />
+          <input type="text" name="batteryMinVolts" value="3.3" />
         </div>
         <div style="grid-column: 1;">
           <label>Contrast Level:</label>
@@ -601,12 +571,6 @@ export class EwtInstallDialog extends LitElement {
           <input type="text" name="logLevel" value="info" />
         </div>
         <div style="grid-column: 1;">
-          <label>SPIFFS Formatted:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="spiffsFormatted" value="false" />
-        </div>
-        <div style="grid-column: 1;">
           <label>Fiat Currency:</label>
         </div>
         <div style="grid-column: 3;">
@@ -616,33 +580,30 @@ export class EwtInstallDialog extends LitElement {
         </div>
       ` : html`
         <div style="grid-column: 1;">
-          <label>Existing Devices:</label>
+          <label>Select Device:</label>
         </div>
         <div style="grid-column: 3;">
           <select name="existingConfigs" @change=${this._handleConfigChange}>
-            <option value="">Select a configuration</option>
             ${this._existingConfigs.map(config => html`
               <option value="${config.id}">${config.title}</option>
             `)}
-            <option value="createNewDevice">Create New Device</option>
+            <option value="createNewDevice" selected>Create New Device</option>
           </select>
         </div>
         <div style="grid-column: 1;" id="titleLabel" style="display: none;">
-        <label>Title:</label>
-      </div>
+          <label>Title:</label>
+        </div>
         <div style="grid-column: 3;">
           <input type="text" name="title" id="titleInput" style="display: none;" />
         </div>
         <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
-        <label>Fiat Currency:</label>
-      </div>
-      <div style="grid-column: 3;">
-        <select id="fiatCurrency" name="fiatCurrency" style="display: none;">
-          ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
-        </select>
-      </div>
-        <input type="hidden" name="apiKey.encoding" value="" />
-        <input type="hidden" name="uriSchemaPrefix" value="" />
+          <label>Fiat Currency:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <select id="fiatCurrency" name="fiatCurrency" style="display: none;">
+            ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+          </select>
+        </div>
       `}
       <div style="grid-column: 1;">
         <label>WiFi SSID:</label>
@@ -656,15 +617,6 @@ export class EwtInstallDialog extends LitElement {
       <div style="grid-column: 3;">
         <input type="text" name="wifiPwd" value="" />
       </div>
-      <input type="hidden" name="fiatPrecision" value="2" />
-      <input type="hidden" name="locale" value="en" />
-      <input type="hidden" name="tftRotation" value="3" />
-      <input type="hidden" name="sleepModeDelay" value="600000" />
-      <input type="hidden" name="batteryMaxVolts" value="3.7" />
-      <input type="hidden" name="batteryMinVolts" value="2.1" />
-      <input type="hidden" name="contrastLevel" value="75" />
-      <input type="hidden" name="logLevel" value="info" />
-      <input type="hidden" name="spiffsFormatted" value="false" />
     </form>
     <ewt-button
       slot="primaryAction"
@@ -682,48 +634,68 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _saveConfiguration() {
-    const form = this.shadowRoot?.querySelector('#configurationForm');
+    const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
-    const formData = new FormData(form as HTMLFormElement);
+  
+    // Create a new FormData instance
+    let formData = new FormData();
+  
+    // Now you can access form.elements without TypeScript errors
+    for (let element of Array.from(form.elements)) {
+      if (element.tagName.toLowerCase() === 'input') {
+        let inputElement = element as HTMLInputElement;
+        formData.append(inputElement.name, inputElement.value);
+      }
+    }
   
     // Convert formData to an object
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
   
-    // Check if an existing configuration is selected
-    if (object.existingConfigs !== 'createNewDevice') {
-      // Find the selected configuration
-      const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
-
-      if (selectedConfig) {
-        // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
-        object['apiKey.key'] = selectedConfig.key;
-        object['callbackUrl'] = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
-        object['fiatCurrency'] = selectedConfig.currency;
-
-        // Remove the "existingConfigs" and "title" field
-        delete object.existingConfigs;
-        delete object.title;
-      }
-    }
+    // If expert mode is enabled, write the data to json exactly as entered by the user
+    if (this._expertMode) {
+      // No additional processing needed for expert mode
+    } else {
+      // Check if an existing configuration is selected
+      if (object.existingConfigs !== 'createNewDevice') {
+        // Find the selected configuration
+        const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
   
-    // Check if "Create New Device" is selected
-    if (object.existingConfigs === 'createNewDevice') {
-      // Here we should call _createNewDevice method and update the form data accordingly
-      const newDevice = await this._createNewDevice();
-      
-      if (newDevice) {
-        object['apiKey.key'] = newDevice.apiKey;
-        object['callbackUrl'] = newDevice.callbackUrl;
-      
-        // Remove the "existingConfigs" and "title" field
-        delete object.existingConfigs;
-        delete object.title;
+        if (selectedConfig) {
+          // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
+          object['apiKey.key'] = selectedConfig.key;
+          object['callbackUrl'] = `https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
+          object['fiatCurrency'] = selectedConfig.currency;
+          object['fiatPrecision'] = '2';
+          object['batteryMaxVolts'] = '4.2';
+          object['batteryMinVolts'] = '3.3';
+          object['contrastLevel'] = '75';
+          object['logLevel'] = 'info';
+  
+          // Remove the "existingConfigs" and "title" field
+          delete object.existingConfigs;
+          delete object.title;
+        }
       }
-    }
-
-    if (object['fiatCurrency'] === 'sat') {
-      object['fiatPrecision'] = '0';
+  
+      // Check if "Create New Device" is selected
+      if (object.existingConfigs === 'createNewDevice') {
+        // Here we should call _createNewDevice method and update the form data accordingly
+        const newDevice = await this._createNewDevice();
+        
+        if (newDevice) {
+          object['apiKey.key'] = newDevice.apiKey;
+          object['callbackUrl'] = newDevice.callbackUrl;
+      
+          // Remove the "existingConfigs" and "title" field
+          delete object.existingConfigs;
+          delete object.title;
+        }
+      }
+  
+      if (object['fiatCurrency'] === 'sat') {
+        object['fiatPrecision'] = '0';
+      }
     }
   
     // Prepare the data to be sent
