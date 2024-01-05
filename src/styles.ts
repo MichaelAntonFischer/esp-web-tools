@@ -7,7 +7,7 @@ import { css } from "lit";
 
 export const dialogStyles = css`
   :host {
-    --mdc-theme-primary: var(--improv-primary-color, #FADA5E);
+    --mdc-theme-primary: var(--improv-primary-color, #FFFFFF);
     --mdc-theme-on-primary: var(--improv-on-primary-color, #C49102);
     --improv-danger-color: #B0B0B0;
     --improv-text-color: #000000;

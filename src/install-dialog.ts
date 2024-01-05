@@ -1468,8 +1468,12 @@ export class EwtInstallDialog extends LitElement {
       ewt-list-item[value="-1"] {
         border-top: 1px solid #ccc;
       }
+
+      .dashboard-buttons ewt-button {
+        width: 100%; /* Full width buttons */
+      }
     `,
-  ];
+    ];
 }
 
 customElements.define("ewt-install-dialog", EwtInstallDialog);
