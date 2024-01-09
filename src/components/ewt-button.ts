@@ -8,8 +8,8 @@ export class EwtButton extends ButtonBase {
     styles,
     css`
       .mdc-button {
-        background-color: #EAB031; /* Yellow background color for button */
-        color: #FFFFFF; /* White text color for button */
+        background-color: #EFBC3F; /* Yellow background color for button */
+        color: #FFFFFF!important; /* White text color for button */
         border-radius: 4px; /* Slightly rounded corners */
         padding: 10px 20px; /* Comfortable padding */
         font-size: 16px; /* Readable font size */

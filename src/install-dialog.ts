@@ -129,7 +129,7 @@ export class EwtInstallDialog extends LitElement {
   // }
 
   private async _fetchConfigs() {
-    const response = await fetch(`https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -214,7 +214,7 @@ export class EwtInstallDialog extends LitElement {
       ]
     };
   
-    const response = await fetch(`https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -235,7 +235,7 @@ export class EwtInstallDialog extends LitElement {
   // Once the new device is created, return an object with the necessary properties
   return {
     apiKey: newDevice.key, // replace 'apiKey' with the actual property name for the API key in the newDevice object
-    callbackUrl: `https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
   };
 }
 
@@ -525,7 +525,7 @@ export class EwtInstallDialog extends LitElement {
         <label>Expert Mode:</label>
       </div>
       <div style="grid-column: 3;">
-        <input type="checkbox" id="expertMode" name="expertMode" @change=${this._toggleExpertMode} />
+        <input type="checkbox" id="expertMode" name="expertMode" .checked=${this._expertMode} @change=${this._toggleExpertMode} />
       </div>
       ${this._expertMode ? html`
         <div style="grid-column: 1;">
@@ -628,9 +628,10 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions];
   }
 
-  private _toggleExpertMode() {
-    this._expertMode = !this._expertMode;
-    this.requestUpdate(); // This is needed to re-render the component
+  private _toggleExpertMode(event: Event) {
+    const checkbox = event.target as HTMLInputElement;
+    this._expertMode = checkbox.checked;
+    this.requestUpdate(); // This triggers a re-render
   }
 
   private async _saveConfiguration() {
@@ -638,19 +639,13 @@ export class EwtInstallDialog extends LitElement {
     if (!form) return;
   
     // Create a new FormData instance
-    let formData = new FormData();
-  
-    // Now you can access form.elements without TypeScript errors
-    for (let element of Array.from(form.elements)) {
-      if (element.tagName.toLowerCase() === 'input') {
-        let inputElement = element as HTMLInputElement;
-        formData.append(inputElement.name, inputElement.value);
-      }
-    }
+    let formData = new FormData(form);
   
     // Convert formData to an object
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
+
+    delete object.expertMode;
   
     // If expert mode is enabled, write the data to json exactly as entered by the user
     if (this._expertMode) {
@@ -664,7 +659,7 @@ export class EwtInstallDialog extends LitElement {
         if (selectedConfig) {
           // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
           object['apiKey.key'] = selectedConfig.key;
-          object['callbackUrl'] = `https://devlnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
+          object['callbackUrl'] = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
           object['fiatCurrency'] = selectedConfig.currency;
           object['fiatPrecision'] = '2';
           object['batteryMaxVolts'] = '4.2';
@@ -686,6 +681,11 @@ export class EwtInstallDialog extends LitElement {
         if (newDevice) {
           object['apiKey.key'] = newDevice.apiKey;
           object['callbackUrl'] = newDevice.callbackUrl;
+          object['fiatPrecision'] = '2';
+          object['batteryMaxVolts'] = '4.2';
+          object['batteryMinVolts'] = '3.3';
+          object['contrastLevel'] = '75';
+          object['logLevel'] = 'info';
       
           // Remove the "existingConfigs" and "title" field
           delete object.existingConfigs;
@@ -705,7 +705,18 @@ export class EwtInstallDialog extends LitElement {
       "method": "setconfig",
       "params": object
     };
-  
+    // Check if the API key or callback url are blank
+    if (!data.params['apiKey.key'] || !data.params['callbackUrl']) {
+      alert('Creating Config Failed: API key or callback url are blank. Please reload the page and try again. If the problem reappears, contact support@opago-pay.com');
+      return;
+    }
+    
+    // Check if the API key or callback url are for demo mode
+    if (data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz' || data.params['callbackUrl'] === 'https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG') {
+      if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
+        return;
+      }
+    }
     // Send the configuration to the ESP32 via JSON-RPC
     try {
       if (!this.port || this.port.readable === null || this.port.writable === null) {
