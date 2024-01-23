@@ -712,7 +712,7 @@ export class EwtInstallDialog extends LitElement {
     }
     
     // Check if the API key or callback url are for demo mode
-    if (data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz' || data.params['callbackUrl'] === 'https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG') {
+    if (data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz' || data.params['callbackUrl'] === 'https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG' || data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
       if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
         return;
       }
