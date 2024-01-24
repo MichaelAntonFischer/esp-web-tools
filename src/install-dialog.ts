@@ -533,16 +533,15 @@ export class EwtInstallDialog extends LitElement {
       this._handleConfigChange(event);
     } 
 
-    const ssidDropdown = this._ssids !== null && this._ssids !== undefined
+    // Define the ssidDropdown template
+    const ssidDropdown = this._ssids && this._ssids.length > 0
       ? html`
           <select @change=${this._handleSsidChange}>
             <option value="">--Select Network--</option>
-            ${this._ssids.map(
-              (ssid) => html`<option value=${ssid.name}>${ssid.name}</option>`
-            )}
+            ${this._ssids.map(ssid => html`<option value=${ssid}>${ssid}</option>`)}
           </select>
         `
-      : "";
+      : '';
 
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
@@ -631,12 +630,18 @@ export class EwtInstallDialog extends LitElement {
         </div>
       `}
       <div style="grid-column: 1;">
-      <label>WiFi SSID:</label>
+        <label>WiFi SSID:</label>
+      </div>
+      <div style="grid-column: 1;">
+        <label>WiFi SSID:</label>
       </div>
       <div style="grid-column: 3;">
-        <input type="text" name="wifiSSID" .value=${this._selectedSsid || ''} @input=${this._handleSsidInput} />
+        <!-- Include the ssidDropdown in the UI -->
         ${ssidDropdown}
-        <ewt-button @click=${this._updateSsids} label="Scan for Networks"></ewt-button>
+        <!-- Text input for manual SSID entry -->
+        <input type="text" name="wifiSSID" .value=${this._selectedSsid || ''} @input=${this._handleSsidInput} />
+        <!-- Scan button to trigger network scanning -->
+        <ewt-button @click=${() => this._updateSsids()} label="Scan"></ewt-button>
       </div>
       <div style="grid-column: 1;">
         <label>WiFi Password:</label>
@@ -1133,45 +1138,26 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _updateSsids(tries = 0) {
-    const oldSsids = this._ssids;
-    this._ssids = undefined;
     this._busy = true;
+    this.requestUpdate(); // Ensure the UI reflects the busy state
 
-    let ssids: Ssid[];
+    let ssids = []; // Initialize ssids with an empty array
 
     try {
       ssids = await this._client!.scan();
-    } catch (err) {
-      // When we fail while loading, pick "Join other"
-      if (this._ssids === undefined) {
-        this._ssids = null;
-        this._selectedSsid = null;
+      if (ssids.length === 0 && tries < 3) {
+        setTimeout(() => this._updateSsids(tries + 1), 1000);
+        return;
       }
-      this._busy = false;
-      return;
-    }
-
-    // We will retry a few times if we don't get any results
-    if (ssids.length === 0 && tries < 3) {
-      console.log("SCHEDULE RETRY", tries);
-      setTimeout(() => this._updateSsids(tries + 1), 1000);
-      return;
-    }
-
-    if (oldSsids) {
-      // If we had a previous list, ensure the selection is still valid
-      if (
-        this._selectedSsid &&
-        !ssids.find((s) => s.name === this._selectedSsid)
-      ) {
-        this._selectedSsid = ssids[0].name;
-      }
-    } else {
+      this._ssids = ssids;
       this._selectedSsid = ssids.length ? ssids[0].name : null;
+    } catch (err) {
+      console.error("Error scanning for SSIDs:", err);
+      this._ssids = []; // Set to an empty array to indicate scan completion with no results
+    } finally {
+      this._busy = false;
+      this.requestUpdate(); // Trigger UI update to reflect the new state
     }
-
-    this._ssids = ssids;
-    this._busy = false;
   }
 
   protected override firstUpdated(changedProps: PropertyValues) {
