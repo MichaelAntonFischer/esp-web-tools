@@ -499,6 +499,20 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions, allowClosing];
   }
 
+  // This method handles changes to the SSID dropdown
+  private _handleSsidChange(event: Event) {
+    const selectElement = event.target as HTMLSelectElement;
+    const ssidInput = this.shadowRoot!.querySelector('input[name="wifiSSID"]') as HTMLInputElement;
+    ssidInput.value = selectElement.value;
+    this._selectedSsid = selectElement.value;
+  }
+  
+  // This method handles input into the SSID text field
+  private _handleSsidInput(event: Event) {
+    const inputElement = event.target as HTMLInputElement;
+    this._selectedSsid = inputElement.value;
+  }
+
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
     let heading: string | undefined = `Configuration`;
@@ -518,7 +532,18 @@ export class EwtInstallDialog extends LitElement {
       });
       this._handleConfigChange(event);
     } 
-  
+
+    const ssidDropdown = this._ssids !== null && this._ssids !== undefined
+      ? html`
+          <select @change=${this._handleSsidChange}>
+            <option value="">--Select Network--</option>
+            ${this._ssids.map(
+              (ssid) => html`<option value=${ssid.name}>${ssid.name}</option>`
+            )}
+          </select>
+        `
+      : "";
+
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
@@ -606,10 +631,12 @@ export class EwtInstallDialog extends LitElement {
         </div>
       `}
       <div style="grid-column: 1;">
-        <label>WiFi SSID:</label>
+      <label>WiFi SSID:</label>
       </div>
       <div style="grid-column: 3;">
-        <input type="text" name="wifiSSID" value="" />
+        <input type="text" name="wifiSSID" .value=${this._selectedSsid || ''} @input=${this._handleSsidInput} />
+        ${ssidDropdown}
+        <ewt-button @click=${this._updateSsids} label="Scan for Networks"></ewt-button>
       </div>
       <div style="grid-column: 1;">
         <label>WiFi Password:</label>
@@ -638,66 +665,31 @@ export class EwtInstallDialog extends LitElement {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
-    // Create a new FormData instance
     let formData = new FormData(form);
-  
-    // Convert formData to an object
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
+    delete object.expertMode; // Always delete the expert mode flag
 
-    delete object.expertMode;
-  
-    // If expert mode is enabled, write the data to json exactly as entered by the user
-    if (this._expertMode) {
-      // No additional processing needed for expert mode
-    } else {
-      // Check if an existing configuration is selected
-      if (object.existingConfigs !== 'createNewDevice') {
-        // Find the selected configuration
-        const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
-  
-        if (selectedConfig) {
-          // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
-          object['apiKey.key'] = selectedConfig.key;
-          object['callbackUrl'] = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
-          object['fiatCurrency'] = selectedConfig.currency;
-          object['fiatPrecision'] = '2';
-          object['batteryMaxVolts'] = '4.2';
-          object['batteryMinVolts'] = '3.3';
-          object['contrastLevel'] = '75';
-          object['logLevel'] = 'info';
-  
-          // Remove the "existingConfigs" and "title" field
-          delete object.existingConfigs;
-          delete object.title;
-        }
-      }
-  
-      // Check if "Create New Device" is selected
+    if (!this._expertMode) {
       if (object.existingConfigs === 'createNewDevice') {
-        // Here we should call _createNewDevice method and update the form data accordingly
         const newDevice = await this._createNewDevice();
-        
         if (newDevice) {
           object['apiKey.key'] = newDevice.apiKey;
           object['callbackUrl'] = newDevice.callbackUrl;
-          object['fiatPrecision'] = '2';
-          object['batteryMaxVolts'] = '4.2';
-          object['batteryMinVolts'] = '3.3';
-          object['contrastLevel'] = '75';
-          object['logLevel'] = 'info';
-      
-          // Remove the "existingConfigs" and "title" field
-          delete object.existingConfigs;
-          delete object.title;
+        }
+      } else {
+        const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
+        if (selectedConfig) {
+          object['apiKey.key'] = selectedConfig.apiKey;
+          object['callbackUrl'] = selectedConfig.callbackUrl;
         }
       }
-  
-      if (object['fiatCurrency'] === 'sat') {
-        object['fiatPrecision'] = '0';
-      }
+
+      // Remove fields not needed for non-expert mode
+      delete object.existingConfigs;
+      delete object.title;
     }
-  
+
     // Prepare the data to be sent
     const data = {
       "jsonrpc": "2.0",
@@ -705,25 +697,14 @@ export class EwtInstallDialog extends LitElement {
       "method": "setconfig",
       "params": object
     };
-    // Check if the API key or callback url are blank
-    if (!data.params['apiKey.key'] || !data.params['callbackUrl']) {
-      alert('Creating Config Failed: API key or callback url are blank. Please reload the page and try again. If the problem reappears, contact support@opago-pay.com');
-      return;
-    }
-    
-    // Check if the API key or callback url are for demo mode
-    if (data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz' || data.params['callbackUrl'] === 'https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG' || data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
-      if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
-        return;
-      }
-    }
+
     // Send the configuration to the ESP32 via JSON-RPC
     try {
       if (!this.port || this.port.readable === null || this.port.writable === null) {
         this.port = await navigator.serial.requestPort();
         await this.port.open({ baudRate: 115200 });
       }
-  
+
       if (this.port.writable) {
         const writer = this.port.writable.getWriter();
         const encoder = new TextEncoder();
@@ -735,7 +716,7 @@ export class EwtInstallDialog extends LitElement {
       } else {
         console.error('The port is not writable');
       } 
-  
+
       // Output the progress to a console-style window
       this._state = "LOGS";
       this.logger.log(`Configuration saved successfully.`);
@@ -862,7 +843,7 @@ export class EwtInstallDialog extends LitElement {
           to connect to.
         </div>
         ${error ? html`<p class="error">${error}</p>` : ""}
-        ${this._ssids !== null
+        ${this._ssids !== null && this._ssids !== undefined
           ? html`
               <ewt-select
                 fixedMenuPosition
@@ -1456,7 +1437,7 @@ export class EwtInstallDialog extends LitElement {
         width: 100%; /* Full width buttons */
       }
     `,
-    ];
+  ];
 }
 
 customElements.define("ewt-install-dialog", EwtInstallDialog);
