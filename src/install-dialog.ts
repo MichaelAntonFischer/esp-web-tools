@@ -103,19 +103,23 @@ export class EwtInstallDialog extends LitElement {
   }
   
   private async _fetchConfigs() {
-    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    try {
+      const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
   
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      // Store the entire configuration objects, not just the ids
+      this._existingConfigs = await response.json();
+    } catch (err) {
+      console.error("Error fetching configs:", err);
     }
-  
-    // Store the entire configuration objects, not just the ids
-    this._existingConfigs = await response.json();
   }
 
   private _handleConfigChange(event: Event) {
@@ -1109,9 +1113,9 @@ export class EwtInstallDialog extends LitElement {
   private async _updateSsids(tries = 0) {
     this._busy = true;
     this.requestUpdate(); // Ensure the UI reflects the busy state
-
+  
     let ssids: Ssid[] = []; // Initialize ssids with an empty array
-
+  
     try {
       if (this._client) {
         ssids = await this._client.scan();
@@ -1124,10 +1128,16 @@ export class EwtInstallDialog extends LitElement {
       this._selectedSsid = ssids.length ? ssids[0].name : null;
     } catch (err) {
       console.error("Error scanning for SSIDs:", err);
-      this._ssids = []; // Set to an empty array to indicate scan completion with no results
     } finally {
       this._busy = false;
-      this.requestUpdate(); // Trigger UI update to reflect the new state
+      this.requestUpdate(); // Ensure the UI reflects the busy state
+    }
+  
+    // Fetch configs separately and handle errors independently
+    try {
+      await this._fetchConfigs();
+    } catch (err) {
+      console.error("Error fetching configs:", err);
     }
   }
 
