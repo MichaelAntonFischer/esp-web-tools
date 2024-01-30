@@ -103,6 +103,10 @@ export class EwtInstallDialog extends LitElement {
   }
   
   private async _fetchConfigs() {
+    if (!api_key) {
+      console.warn('API key is not available, skipping fetch configs.');
+      return;
+    }
     try {
       const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
         method: 'GET',
@@ -1104,74 +1108,48 @@ export class EwtInstallDialog extends LitElement {
       this._provisionForce = false;
     }
 
+    // Fetch currencies on configure
+    if (this._state === "CONFIGURE") {
+      this._fetchCurrencies();
+    }
+
     if (this._state === "INSTALL") {
       this._installConfirmed = false;
       this._installState = undefined;
     }
   }
 
-  private async _updateSsids(tries = 0) {
+  private async _updateSsids() {
     this._busy = true;
-    this.requestUpdate(); // Ensure the UI reflects the busy state
-  
-    let ssids: Ssid[] = []; // Initialize ssids with an empty array
-  
+    this.requestUpdate(); // Trigger UI update to reflect busy state
+
     try {
       if (this._client) {
-        ssids = await this._client.scan();
+        console.log('Starting Wi-Fi scan...');
+        const ssids = await this._client.scan();
+        console.log('Wi-Fi scan completed:', ssids);
+        if (ssids.length === 0) {
+          console.log('No SSIDs found. Retrying...');
+        }
+        this._ssids = ssids;
+        this.requestUpdate(); // Trigger UI update to reflect new SSIDs
+      } else {
+        console.error('Wi-Fi client is not initialized.');
       }
-      if (ssids.length === 0 && tries < 3) {
-        setTimeout(() => this._updateSsids(tries + 1), 1000);
-        return;
-      }
-      this._ssids = ssids;
-      this._selectedSsid = ssids.length ? ssids[0].name : null;
-    } catch (err) {
-      console.error("Error scanning for SSIDs:", err);
+    } catch (error) {
+      console.error('Wi-Fi scanning failed:', error);
     } finally {
       this._busy = false;
-      this.requestUpdate(); // Ensure the UI reflects the busy state
-    }
-  
-    // Fetch configs separately and handle errors independently
-    try {
-      await this._fetchConfigs();
-    } catch (err) {
-      console.error("Error fetching configs:", err);
+      this.requestUpdate(); // Trigger UI update to reflect not-busy state
     }
   }
 
-  protected override firstUpdated(changedProps: PropertyValues) {
+  protected override async firstUpdated(changedProps: PropertyValues) {
     super.firstUpdated(changedProps);
-    this._initialize();
-  }
-
-  protected override updated(changedProps: PropertyValues) {
-    super.updated(changedProps);
-  
-    if (changedProps.has("_state")) {
-      this.setAttribute("state", this._state);
-  
-      if (this._state === "CONFIGURE") {
-        this._fetchCurrencies();
-      } else if (this._state === "PROVISION") {
-        if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
-          // If we pick "Join other", select SSID input.
-          this._focusFormElement("ewt-textfield[name=ssid]");
-        } else if (changedProps.has("_ssids")) {
-          // Form is shown when SSIDs are loaded/marked not supported
-          this._focusFormElement();
-        }
-      }
-    }
-  }
-
-  private _focusFormElement(selector = "ewt-textfield, ewt-select") {
-    const formEl = this.shadowRoot!.querySelector(
-      selector,
-    ) as LitElement | null;
-    if (formEl) {
-      formEl.updateComplete.then(() => setTimeout(() => formEl.focus(), 100));
+    await this._initialize();
+    // After initialization, check if the client is set before updating SSIDs
+    if (this._client) {
+      await this._updateSsids();
     }
   }
 
@@ -1182,7 +1160,7 @@ export class EwtInstallDialog extends LitElement {
         "Serial port is not readable/writable. Close any other application using it and try again.";
       return;
     }
-
+  
     try {
       this._manifest = await downloadManifest(this.manifestPath);
     } catch (err: any) {
@@ -1190,20 +1168,18 @@ export class EwtInstallDialog extends LitElement {
       this._error = "Failed to download manifest";
       return;
     }
-
+  
     if (this._manifest.new_install_improv_wait_time === 0) {
       this._client = null;
       return;
     }
-
+  
     const client = new ImprovSerial(this.port!, this.logger);
     client.addEventListener("state-changed", () => {
       this.requestUpdate();
     });
     client.addEventListener("error-changed", () => this.requestUpdate());
     try {
-      // If a device was just installed, give new firmware 10 seconds (overridable) to
-      // format the rest of the flash and do other stuff.
       const timeout = !justInstalled
         ? 1000
         : this._manifest.new_install_improv_wait_time !== undefined
@@ -1212,8 +1188,10 @@ export class EwtInstallDialog extends LitElement {
       this._info = await client.initialize(timeout);
       this._client = client;
       client.addEventListener("disconnect", this._handleDisconnect);
+
+      // Call _updateSsids after the client is initialized
+      await this._updateSsids();
     } catch (err: any) {
-      // Clear old value
       this._info = undefined;
       if (err instanceof PortNotReady) {
         this._state = "ERROR";
