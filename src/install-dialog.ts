@@ -641,7 +641,7 @@ export class EwtInstallDialog extends LitElement {
         <!-- Text input for manual SSID entry -->
         <input type="text" name="wifiSSID" .value=${this._selectedSsid || ''} @input=${this._handleSsidInput} />
         <!-- Scan button to trigger network scanning -->
-        <ewt-button @click=${() => this._updateSsids()} label="Scan"></ewt-button>
+        <ewt-button @click=${() => this._updateSsids()} label="Scan WiFi"></ewt-button>
       </div>
       <div style="grid-column: 1;">
         <label>WiFi Password:</label>
