@@ -101,33 +101,7 @@ export class EwtInstallDialog extends LitElement {
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
   }
-  // Fetching currencies from server is currently disabled
-  // private async _fetchCurrencies() {
-  //   try {
-  //     const response = await fetch('https://lnbits.opago-pay.com/api/v1/currencies', {
-  //       method: 'GET',
-  //       headers: {
-  //         'Accept': 'application/json',
-  //       },
-  //     });
-  // 
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-  // 
-  //     const fetchedCurrencies = await response.json();
-  //     this._currencies = ['EUR', 'USD', 'CHF', ...fetchedCurrencies];
-  //   } catch (e) {
-  //     // If there is an error fetching the currencies, we still show EUR, USD and CHF
-  //     this._currencies = ['EUR', 'USD', 'CHF'];
-  //     if (e instanceof Error) {
-  //       this.logger.error("There was an error fetching the currencies: ", e.message);
-  //     } else {
-  //       this.logger.error("There was an error fetching the currencies: ", e);
-  //     }
-  //   }
-  // }
-
+  
   private async _fetchConfigs() {
     const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'GET',
@@ -534,14 +508,12 @@ export class EwtInstallDialog extends LitElement {
     } 
 
     // Define the ssidDropdown template
-    const ssidDropdown = this._ssids && this._ssids.length > 0
-      ? html`
-          <select @change=${this._handleSsidChange}>
-            <option value="">--Select Network--</option>
-            ${this._ssids.map(ssid => html`<option value=${ssid}>${ssid}</option>`)}
-          </select>
-        `
-      : '';
+    const ssidDropdown = html`
+      <select @change=${this._handleSsidChange}>
+        <option value="">--Select Network--</option>
+        ${this._ssids ? this._ssids.map(ssid => html`<option value=${ssid}>${ssid}</option>`) : ''}
+      </select>
+    `;
 
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
@@ -629,9 +601,6 @@ export class EwtInstallDialog extends LitElement {
           </select>
         </div>
       `}
-      <div style="grid-column: 1;">
-        <label>WiFi SSID:</label>
-      </div>
       <div style="grid-column: 1;">
         <label>WiFi SSID:</label>
       </div>
@@ -1141,10 +1110,12 @@ export class EwtInstallDialog extends LitElement {
     this._busy = true;
     this.requestUpdate(); // Ensure the UI reflects the busy state
 
-    let ssids = []; // Initialize ssids with an empty array
+    let ssids: Ssid[] = []; // Initialize ssids with an empty array
 
     try {
-      ssids = await this._client!.scan();
+      if (this._client) {
+        ssids = await this._client.scan();
+      }
       if (ssids.length === 0 && tries < 3) {
         setTimeout(() => this._updateSsids(tries + 1), 1000);
         return;
