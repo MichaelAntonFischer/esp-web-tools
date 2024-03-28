@@ -44,12 +44,6 @@ const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 
-interface ScanResponse {
-  jsonrpc: string;
-  id: string;
-  result: any; 
-}
-
 export class EwtInstallDialog extends LitElement {
   public port!: SerialPort;
 
@@ -103,11 +97,6 @@ export class EwtInstallDialog extends LitElement {
   @state() private _currencies: string[] = [];
 
   @state() private _existingConfigs: any[] = [];
-
-  connectedCallback() {
-    super.connectedCallback(); // Always call the super method first in connectedCallback
-    this._attemptPauseWifiTask();
-  }
 
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
@@ -656,17 +645,17 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions];
   }
 
-  private async _scanSSIDs(retryCount: number = 0): Promise<ScanResponse | undefined> {
+  private async _scanSSIDs() {
     const id = "1";
     const jsonRpcVersion = "2.0";
-
+  
     const data = {
       "jsonrpc": jsonRpcVersion,
       "id": id,
       "method": "scanSSIDs",
       "params": {}
     };
-
+  
     // Write the data to the serial port
     if (this.port && this.port.writable) {
       const writer = this.port.writable.getWriter();
@@ -678,59 +667,59 @@ export class EwtInstallDialog extends LitElement {
     } else {
       throw new Error("Serial port is not open or writable");
     }
-
-    // Read the response from the serial port
-    if (this.port && this.port.readable) {
-      const reader = this.port.readable.getReader();
-      try {
-        let completeData = '';
-        let jsonStarted = false;
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) {
-            break;
-          }
-          const textDecoder = new TextDecoder();
-          const chunk = textDecoder.decode(value, { stream: true });
-          completeData += chunk;
-
-          if (chunk.includes('{')) {
-            jsonStarted = true;
-            completeData = completeData.substring(completeData.indexOf('{'));
-          }
-
-          if (jsonStarted && chunk.includes('}')) {
-            completeData = completeData.substring(0, completeData.lastIndexOf('}') + 1);
-            break;
-          }
+  
+  // Read the response from the serial port
+  if (this.port && this.port.readable) {
+    const reader = this.port.readable.getReader();
+    try {
+      let completeData = '';
+      let jsonStarted = false;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          // The stream has been closed or we finished reading.
+          break;
         }
-        reader.releaseLock();
+        const textDecoder = new TextDecoder();
+        const chunk = textDecoder.decode(value, { stream: true });
+        completeData += chunk;
 
-        if (jsonStarted) {
-          // Unescape the string
-          completeData = completeData.replace(/\\(.)/mg, "$1");
-          const response: ScanResponse = JSON.parse(completeData);
-          console.log("Parsed JSON response:", response);
-
-          // Check if the result is an empty array and retry if necessary
-          if (Array.isArray(response.result) && response.result.length === 0 && retryCount < 5) {
-            console.log(`Received empty SSID list, retrying... (${retryCount + 1})`);
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds before retrying
-            return this._scanSSIDs(retryCount + 1);
-          }
-
-          return response;
-        } else {
-          throw new Error("No JSON data received from the serial port");
+        // Check if the JSON data starts (assuming JSON starts with '{')
+        if (chunk.includes('{')) {
+          jsonStarted = true;
+          // Trim the data from the start to the first '{'
+          completeData = completeData.substring(completeData.indexOf('{'));
         }
-      } catch (error) {
-        console.error('Error reading from serial port:', error);
-        throw error;
+
+        // If JSON has started and we find the end of JSON (assuming it ends with '}')
+        if (jsonStarted && chunk.includes('}')) {
+          // Trim the data from the end of JSON to the end
+          completeData = completeData.substring(0, completeData.lastIndexOf('}') + 1);
+          break;
+        }
       }
-    } else {
-      throw new Error("Serial port is not open or readable");
+      reader.releaseLock();
+
+      // Log the complete data for debugging
+      console.log("Complete data received from serial port:", completeData);
+
+      if (jsonStarted) {
+        // Parse the JSON data
+        const response = JSON.parse(completeData);
+        // Log the parsed response
+        console.log("Parsed JSON response:", response);
+        return response;
+      } else {
+        throw new Error("No JSON data received from the serial port");
+      }
+    } catch (error) {
+      console.error('Error reading from serial port:', error);
+      throw error;
     }
+  } else {
+    throw new Error("Serial port is not open or readable");
   }
+}
 
 private async _pauseWifiTask() {
   const id = "1";
@@ -802,19 +791,27 @@ private async _pauseWifiTask() {
     const dropdown = event.target as HTMLSelectElement;
     if (dropdown.options.length === 1) {
       try {
-        const scanResponse = await this._scanSSIDs();
-        if (scanResponse) { // Check if scanResponse is not undefined
+        // First, pause the WiFi task
+        //const pauseResponse = await this._pauseWifiTask();
+        //if (pauseResponse && pauseResponse.result === "WiFi task paused successfully.") {
+          // Now that the WiFi task is paused, scan for SSIDs
+          const scanResponse = await this._scanSSIDs();
           // Check if 'result' is a string and parse it as JSON to get the array
           const ssids = typeof scanResponse.result === 'string' ? JSON.parse(scanResponse.result) : scanResponse.result;
-      
+
           if (Array.isArray(ssids)) {
-            // ... handle the array of SSIDs ...
+            ssids.forEach((ssid: string) => {
+              const option = document.createElement('option');
+              option.value = ssid;
+              option.text = ssid;
+              dropdown.add(option);
+            });
           } else {
             console.error('The "result" field does not contain an array:', ssids);
           }
-        } else {
-          console.error('No scan response received');
-        }
+        //} else {
+        //  console.error('Failed to pause WiFi task:', pauseResponse);
+        //}
       } catch (error) {
         console.error('Error handling SSID click:', error);
       }
