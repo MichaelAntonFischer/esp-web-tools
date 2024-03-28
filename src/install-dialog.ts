@@ -700,10 +700,14 @@ export class EwtInstallDialog extends LitElement {
       }
       reader.releaseLock();
 
+      // Log the complete data for debugging
+      console.log("Complete data received from serial port:", completeData);
+
       if (jsonStarted) {
         // Parse the JSON data
         const response = JSON.parse(completeData);
-        console.log(response);
+        // Log the parsed response
+        console.log("Parsed JSON response:", response);
         return response;
       } else {
         throw new Error("No JSON data received from the serial port");
@@ -717,18 +721,29 @@ export class EwtInstallDialog extends LitElement {
   }
 }
   
-  private async _handleSSIDClick(event: Event) {
-    const dropdown = event.target as HTMLSelectElement;
-    if (dropdown.options.length === 1) {
-      const ssids = await this._scanSSIDs();
-      ssids.forEach((ssid: string) => {
-        const option = document.createElement('option');
-        option.value = ssid;
-        option.text = ssid;
-        dropdown.add(option);
-      });
+private async _handleSSIDClick(event: Event) {
+  const dropdown = event.target as HTMLSelectElement;
+  if (dropdown.options.length === 1) {
+    try {
+      const response = await this._scanSSIDs();
+      // Check if 'result' is a string and parse it as JSON to get the array
+      const ssids = typeof response.result === 'string' ? JSON.parse(response.result) : response.result;
+
+      if (Array.isArray(ssids)) {
+        ssids.forEach((ssid: string) => {
+          const option = document.createElement('option');
+          option.value = ssid;
+          option.text = ssid;
+          dropdown.add(option);
+        });
+      } else {
+        console.error('The "result" field does not contain an array:', ssids);
+      }
+    } catch (error) {
+      console.error('Error handling SSID click:', error);
     }
   }
+}
 
   private _toggleExpertMode(event: Event) {
     const checkbox = event.target as HTMLInputElement;
