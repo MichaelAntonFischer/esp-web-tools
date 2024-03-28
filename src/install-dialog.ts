@@ -720,30 +720,103 @@ export class EwtInstallDialog extends LitElement {
     throw new Error("Serial port is not open or readable");
   }
 }
-  
-private async _handleSSIDClick(event: Event) {
-  const dropdown = event.target as HTMLSelectElement;
-  if (dropdown.options.length === 1) {
-    try {
-      const response = await this._scanSSIDs();
-      // Check if 'result' is a string and parse it as JSON to get the array
-      const ssids = typeof response.result === 'string' ? JSON.parse(response.result) : response.result;
 
-      if (Array.isArray(ssids)) {
-        ssids.forEach((ssid: string) => {
-          const option = document.createElement('option');
-          option.value = ssid;
-          option.text = ssid;
-          dropdown.add(option);
-        });
+private async _pauseWifiTask() {
+  const id = "1";
+  const jsonRpcVersion = "2.0";
+
+  const data = {
+    "jsonrpc": jsonRpcVersion,
+    "id": id,
+    "method": "pauseWifiTask",
+    "params": {}
+  };
+
+  // Write the data to the serial port
+  if (this.port && this.port.writable) {
+    const writer = this.port.writable.getWriter();
+    const encoder = new TextEncoder();
+    const dataStr = JSON.stringify(data) + "\n";
+    const encodedData = encoder.encode(dataStr);
+    await writer.write(encodedData);
+    writer.releaseLock();
+  } else {
+    throw new Error("Serial port is not open or writable");
+  }
+
+  // Read the response from the serial port
+  if (this.port && this.port.readable) {
+    const reader = this.port.readable.getReader();
+    try {
+      let completeData = '';
+      let jsonStarted = false;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        const textDecoder = new TextDecoder();
+        const chunk = textDecoder.decode(value, { stream: true });
+        completeData += chunk;
+
+        if (chunk.includes('{')) {
+          jsonStarted = true;
+          completeData = completeData.substring(completeData.indexOf('{'));
+        }
+
+        if (jsonStarted && chunk.includes('}')) {
+          completeData = completeData.substring(0, completeData.lastIndexOf('}') + 1);
+          break;
+        }
+      }
+      reader.releaseLock();
+
+      if (jsonStarted) {
+        const response = JSON.parse(completeData);
+        console.log("Pause WiFi task response:", response);
+        return response;
       } else {
-        console.error('The "result" field does not contain an array:', ssids);
+        throw new Error("No JSON data received from the serial port");
       }
     } catch (error) {
-      console.error('Error handling SSID click:', error);
+      console.error('Error reading from serial port:', error);
+      throw error;
     }
+  } else {
+    throw new Error("Serial port is not open or readable");
   }
 }
+
+  private async _handleSSIDClick(event: Event) {
+    const dropdown = event.target as HTMLSelectElement;
+    if (dropdown.options.length === 1) {
+      try {
+        // First, pause the WiFi task
+        const pauseResponse = await this._pauseWifiTask();
+        if (pauseResponse && pauseResponse.result === "WiFi task paused successfully.") {
+          // Now that the WiFi task is paused, scan for SSIDs
+          const scanResponse = await this._scanSSIDs();
+          // Check if 'result' is a string and parse it as JSON to get the array
+          const ssids = typeof scanResponse.result === 'string' ? JSON.parse(scanResponse.result) : scanResponse.result;
+
+          if (Array.isArray(ssids)) {
+            ssids.forEach((ssid: string) => {
+              const option = document.createElement('option');
+              option.value = ssid;
+              option.text = ssid;
+              dropdown.add(option);
+            });
+          } else {
+            console.error('The "result" field does not contain an array:', ssids);
+          }
+        } else {
+          console.error('Failed to pause WiFi task:', pauseResponse);
+        }
+      } catch (error) {
+        console.error('Error handling SSID click:', error);
+      }
+    }
+  }
 
   private _toggleExpertMode(event: Event) {
     const checkbox = event.target as HTMLInputElement;
