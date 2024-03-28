@@ -607,29 +607,33 @@ export class EwtInstallDialog extends LitElement {
         </div>
       `}
       <div style="grid-column: 1;">
-        <label>WiFi SSID:</label>
-      </div>
-      <div style="grid-column: 3;">
-        <input type="text" name="wifiSSID" value="" />
-      </div>
-      <div style="grid-column: 1;">
-        <label>WiFi Password:</label>
-      </div>
-      <div style="grid-column: 3;">
-        <input type="text" name="wifiPwd" value="" />
-      </div>
-      <div style="grid-column: 1;">
-        <label>WiFi SSID 2:</label>
-      </div>
-      <div style="grid-column: 3;">
-        <input type="text" name="wifiSSID2" value="" />
-      </div>
-      <div style="grid-column: 1;">
-        <label>WiFi Password 2:</label>
-      </div>
-      <div style="grid-column: 3;">
-        <input type="text" name="wifiPwd2" value="" />
-      </div>
+      <label>WiFi SSID:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
+        <option value="">--select SSID--</option>
+      </select>
+    </div>
+    <div style="grid-column: 1;">
+      <label>WiFi Password:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <input type="text" name="wifiPwd" value="" />
+    </div>
+    <div style="grid-column: 1;">
+      <label>WiFi SSID 2:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
+        <option value="">--select SSID--</option>
+      </select>
+    </div>
+    <div style="grid-column: 1;">
+      <label>WiFi Password 2:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <input type="text" name="wifiPwd2" value="" />
+    </div>
     </form>
     <ewt-button
       slot="primaryAction"
@@ -639,6 +643,68 @@ export class EwtInstallDialog extends LitElement {
   `;
   
     return [heading, content, hideActions];
+  }
+
+  private async _scanSSIDs() {
+    const id = "1";
+    const jsonRpcVersion = "2.0";
+  
+    const data = {
+      "jsonrpc": jsonRpcVersion,
+      "id": id,
+      "method": "scanSSIDs",
+      "params": {}
+    };
+  
+    // Write the data to the serial port
+    if (this.port) {
+      const writer = this.port.writable?.getWriter();
+      const encoder = new TextEncoder();
+      const dataStr = JSON.stringify(data) + "\n";
+      const encodedData = encoder.encode(dataStr);
+      await writer?.write(encodedData);
+      writer?.releaseLock();
+    } else {
+      throw new Error("Serial port is not open");
+    }
+  
+    // Read the response from the serial port
+    if (this.port) {
+      const reader = this.port.readable?.getReader();
+      const readResult = await reader?.read();
+      if (readResult) {
+        const { value, done } = readResult;
+        reader?.releaseLock();
+  
+        if (done) {
+          throw new Error("No data received from the serial port");
+        }
+  
+        const response = JSON.parse(new TextDecoder().decode(value));
+  
+        // Log the response to the console
+        console.log(response);
+  
+        return response;
+      } else {
+        throw new Error("No data received from the serial port");
+      }
+    } else {
+      throw new Error("Serial port is not open");
+    }
+  }
+  
+  private async _handleSSIDClick(event: Event) {
+    const dropdown = event.target as HTMLSelectElement;
+    if (dropdown.options.length === 1) {
+      const ssids = await this._scanSSIDs();
+      ssids.forEach((ssid: string) => {
+        const option = document.createElement('option');
+        option.value = ssid;
+        option.text = ssid;
+        dropdown.add(option);
+      });
+    }
   }
 
   private _toggleExpertMode(event: Event) {
