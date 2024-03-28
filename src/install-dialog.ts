@@ -40,6 +40,7 @@ console.log(
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
+const domain = 'devapi.opago-pay.com';
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 
@@ -104,7 +105,7 @@ export class EwtInstallDialog extends LitElement {
   // Fetching currencies from server is currently disabled
   // private async _fetchCurrencies() {
   //   try {
-  //     const response = await fetch('https://lnbits.opago-pay.com/api/v1/currencies', {
+  //     const response = await fetch('https://${domain}/api/v1/currencies', {
   //       method: 'GET',
   //       headers: {
   //         'Accept': 'application/json',
@@ -129,7 +130,7 @@ export class EwtInstallDialog extends LitElement {
   // }
 
   private async _fetchConfigs() {
-    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -214,7 +215,7 @@ export class EwtInstallDialog extends LitElement {
       ]
     };
   
-    const response = await fetch(`https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -235,7 +236,7 @@ export class EwtInstallDialog extends LitElement {
   // Once the new device is created, return an object with the necessary properties
   return {
     apiKey: newDevice.key, // replace 'apiKey' with the actual property name for the API key in the newDevice object
-    callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    callbackUrl: `https://${domain}/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
   };
 }
 
@@ -538,7 +539,7 @@ export class EwtInstallDialog extends LitElement {
           <label>Callback URL:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
+          <input type="text" name="callbackUrl" value="https://${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
         </div>
         <div style="grid-column: 1;">
           <label>Fiat Precision:</label>
@@ -606,25 +607,25 @@ export class EwtInstallDialog extends LitElement {
         </div>
       `}
       <div style="grid-column: 1;">
-        <label>Primary WiFi SSID:</label>
+        <label>WiFi SSID:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="text" name="wifiSSID" value="" />
       </div>
       <div style="grid-column: 1;">
-        <label>Primary WiFi Password:</label>
+        <label>WiFi Password:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="text" name="wifiPwd" value="" />
       </div>
       <div style="grid-column: 1;">
-        <label>Backup WiFi SSID:</label>
+        <label>WiFi SSID 2:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="text" name="wifiSSID2" value="" />
       </div>
       <div style="grid-column: 1;">
-        <label>Backup WiFi Password:</label>
+        <label>WiFi Password 2:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="text" name="wifiPwd2" value="" />
@@ -671,7 +672,7 @@ export class EwtInstallDialog extends LitElement {
         if (selectedConfig) {
           // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
           object['apiKey.key'] = selectedConfig.key;
-          object['callbackUrl'] = `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
+          object['callbackUrl'] = `https://${domain}/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
           object['fiatCurrency'] = selectedConfig.currency;
           object['fiatPrecision'] = '2';
           object['batteryMaxVolts'] = '4.2';
@@ -724,7 +725,7 @@ export class EwtInstallDialog extends LitElement {
     }
     
     // Check if the API key or callback url are for demo mode
-    if (data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz' || data.params['callbackUrl'] === 'https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG' || data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
+    if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
       if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
         return;
       }
