@@ -606,16 +606,28 @@ export class EwtInstallDialog extends LitElement {
         </div>
       `}
       <div style="grid-column: 1;">
-        <label>WiFi SSID:</label>
+        <label>Primary WiFi SSID:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="text" name="wifiSSID" value="" />
       </div>
       <div style="grid-column: 1;">
-        <label>WiFi Password:</label>
+        <label>Primary WiFi Password:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="text" name="wifiPwd" value="" />
+      </div>
+      <div style="grid-column: 1;">
+        <label>Backup WiFi SSID:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <input type="text" name="wifiSSID2" value="" />
+      </div>
+      <div style="grid-column: 1;">
+        <label>Backup WiFi Password:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <input type="text" name="wifiPwd2" value="" />
       </div>
     </form>
     <ewt-button
