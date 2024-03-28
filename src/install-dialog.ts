@@ -40,7 +40,7 @@ console.log(
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
-const domain = 'devapi.opago-pay.com';
+const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago-pay.com' : 'api.opago-pay.com';
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 
