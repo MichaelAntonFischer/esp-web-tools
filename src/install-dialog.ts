@@ -791,10 +791,6 @@ private async _pauseWifiTask() {
     const dropdown = event.target as HTMLSelectElement;
     if (dropdown.options.length === 1) {
       try {
-        // First, pause the WiFi task
-        //const pauseResponse = await this._pauseWifiTask();
-        //if (pauseResponse && pauseResponse.result === "WiFi task paused successfully.") {
-          // Now that the WiFi task is paused, scan for SSIDs
           const scanResponse = await this._scanSSIDs();
           // Check if 'result' is a string and parse it as JSON to get the array
           const ssids = typeof scanResponse.result === 'string' ? JSON.parse(scanResponse.result) : scanResponse.result;
@@ -809,9 +805,6 @@ private async _pauseWifiTask() {
           } else {
             console.error('The "result" field does not contain an array:', ssids);
           }
-        //} else {
-        //  console.error('Failed to pause WiFi task:', pauseResponse);
-        //}
       } catch (error) {
         console.error('Error handling SSID click:', error);
       }
