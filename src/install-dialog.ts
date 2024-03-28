@@ -792,8 +792,8 @@ private async _pauseWifiTask() {
     if (dropdown.options.length === 1) {
       try {
         // First, pause the WiFi task
-        const pauseResponse = await this._pauseWifiTask();
-        if (pauseResponse && pauseResponse.result === "WiFi task paused successfully.") {
+        //const pauseResponse = await this._pauseWifiTask();
+        //if (pauseResponse && pauseResponse.result === "WiFi task paused successfully.") {
           // Now that the WiFi task is paused, scan for SSIDs
           const scanResponse = await this._scanSSIDs();
           // Check if 'result' is a string and parse it as JSON to get the array
@@ -809,9 +809,9 @@ private async _pauseWifiTask() {
           } else {
             console.error('The "result" field does not contain an array:', ssids);
           }
-        } else {
-          console.error('Failed to pause WiFi task:', pauseResponse);
-        }
+        //} else {
+        //  console.error('Failed to pause WiFi task:', pauseResponse);
+        //}
       } catch (error) {
         console.error('Error handling SSID click:', error);
       }
@@ -1338,6 +1338,25 @@ private async _pauseWifiTask() {
     if (this._state === "INSTALL") {
       this._installConfirmed = false;
       this._installState = undefined;
+    }
+  }
+
+  private async _attemptPauseWifiTask(attempt = 1, maxAttempts = 5) {
+    try {
+      const response = await this._pauseWifiTask();
+      if (response && response.result === "WiFi task paused successfully.") {
+        console.log("WiFi task paused successfully.");
+        // WiFi task is paused, you can now proceed with other operations like scanning SSIDs
+      } else {
+        throw new Error(`Pause WiFi task failed on attempt ${attempt}: ${response}`);
+      }
+    } catch (error) {
+      console.error(error);
+      if (attempt < maxAttempts) {
+        setTimeout(() => this._attemptPauseWifiTask(attempt + 1, maxAttempts), 2000); // Wait 2 seconds before retrying
+      } else {
+        console.error("Maximum attempts to pause WiFi task reached.");
+      }
     }
   }
 
