@@ -1354,12 +1354,10 @@ private async _pauseWifiTask() {
   }
 
   private async _updateSsids(tries = 0) {
-    const oldSsids = this._ssids;
-    this._ssids = undefined;
     this._busy = true;
-
+  
     let ssids: Ssid[];
-
+  
     try {
       ssids = await this._client!.scan();
     } catch (err) {
@@ -1371,33 +1369,44 @@ private async _pauseWifiTask() {
       this._busy = false;
       return;
     }
-
+  
     // We will retry a few times if we don't get any results
     if (ssids.length === 0 && tries < 3) {
       console.log("SCHEDULE RETRY", tries);
       setTimeout(() => this._updateSsids(tries + 1), 1000);
       return;
     }
-
-    if (oldSsids) {
-      // If we had a previous list, ensure the selection is still valid
-      if (
-        this._selectedSsid &&
-        !ssids.find((s) => s.name === this._selectedSsid)
-      ) {
-        this._selectedSsid = ssids[0].name;
-      }
-    } else {
+  
+    // Merge new SSIDs with existing ones, removing duplicates
+    const existingSsidsSet = new Set(this._ssids ? this._ssids.map(ssid => ssid.name) : []);
+    const newSsids = ssids.filter(ssid => !existingSsidsSet.has(ssid.name));
+  
+    if (newSsids.length > 0) {
+      this._ssids = [...(this._ssids || []), ...newSsids];
+    }
+  
+    // If we had a previous list, ensure the selection is still valid
+    if (this._selectedSsid && !ssids.find((s) => s.name === this._selectedSsid)) {
       this._selectedSsid = ssids.length ? ssids[0].name : null;
     }
-
-    this._ssids = ssids;
+  
     this._busy = false;
+  }
+
+  private async _initialScanForSsids(attempts = 0) {
+    if (attempts < 12) {
+      await this._updateSsids();
+      if (this._ssids && this._ssids.length > 0) {
+        return; // SSIDs found, stop scanning
+      }
+      setTimeout(() => this._initialScanForSsids(attempts + 1), 5000); // Wait 5 seconds before next attempt
+    }
   }
 
   protected override firstUpdated(changedProps: PropertyValues) {
     super.firstUpdated(changedProps);
     this._initialize();
+    this._initialScanForSsids();
   }
 
   protected override updated(changedProps: PropertyValues) {
