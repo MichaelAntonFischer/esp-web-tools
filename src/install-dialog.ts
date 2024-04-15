@@ -87,47 +87,18 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _busy = false;
 
-  // undefined = not loaded
-  // null = not available
-  @state() private _ssids?: Ssid[] | null;
-
-  // Name of Ssid. Null = other
   @state() private _selectedSsid: string | null = null;
 
   @state() private _currencies: string[] = [];
 
   @state() private _existingConfigs: any[] = [];
 
+  @state() private _ssids: Array<{name: string, secured: boolean}> = [];
+
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
   }
-  // Fetching currencies from server is currently disabled
-  // private async _fetchCurrencies() {
-  //   try {
-  //     const response = await fetch('https://${domain}/api/v1/currencies', {
-  //       method: 'GET',
-  //       headers: {
-  //         'Accept': 'application/json',
-  //       },
-  //     });
-  // 
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-  // 
-  //     const fetchedCurrencies = await response.json();
-  //     this._currencies = ['EUR', 'USD', 'CHF', ...fetchedCurrencies];
-  //   } catch (e) {
-  //     // If there is an error fetching the currencies, we still show EUR, USD and CHF
-  //     this._currencies = ['EUR', 'USD', 'CHF'];
-  //     if (e instanceof Error) {
-  //       this.logger.error("There was an error fetching the currencies: ", e.message);
-  //     } else {
-  //       this.logger.error("There was an error fetching the currencies: ", e);
-  //     }
-  //   }
-  // }
 
   private async _fetchConfigs() {
     const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
@@ -182,7 +153,6 @@ export class EwtInstallDialog extends LitElement {
       }
     }
   }
-  
 
   private async _createNewDevice() {
     let title: string = '';
@@ -239,7 +209,6 @@ export class EwtInstallDialog extends LitElement {
     callbackUrl: `https://${domain}/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
   };
 }
-
 
   protected render() {
     if (!this.port) {
@@ -454,6 +423,7 @@ export class EwtInstallDialog extends LitElement {
 
     return [heading, content, hideActions, allowClosing];
   }
+
   _renderDashboardNoImprov(): [string, TemplateResult, boolean, boolean] {
     const heading = "Device Dashboard";
     let content: TemplateResult;
@@ -502,6 +472,8 @@ export class EwtInstallDialog extends LitElement {
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
+    this._initialScanForSsids();  // Prepopulate the SSID list when the configuration form is initialized
+
     let heading: string | undefined = `Configuration`;
     let content: TemplateResult;
     let hideActions = false;
@@ -579,39 +551,14 @@ export class EwtInstallDialog extends LitElement {
             ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
           </select>
         </div>
-      ` : html`
-        <div style="grid-column: 1;">
-          <label>Select Device:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <select name="existingConfigs" @change=${this._handleConfigChange}>
-            ${this._existingConfigs.map(config => html`
-              <option value="${config.id}">${config.title}</option>
-            `)}
-            <option value="createNewDevice" selected>Create New Device</option>
-          </select>
-        </div>
-        <div style="grid-column: 1;" id="titleLabel" style="display: none;">
-          <label>Title:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="title" id="titleInput" style="display: none;" />
-        </div>
-        <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
-          <label>Fiat Currency:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <select id="fiatCurrency" name="fiatCurrency" style="display: none;">
-            ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
-          </select>
-        </div>
-      `}
+      ` : html``}
       <div style="grid-column: 1;">
       <label>WiFi SSID:</label>
     </div>
     <div style="grid-column: 3;">
-      <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
+      <select id="wifiSSID" name="wifiSSID" @click=${() => this._updateSsids()}>
         <option value="">--select SSID--</option>
+        ${this._ssids.map(info => html`<option value="${info.name}">${info.name}</option>`)}
       </select>
     </div>
     <div style="grid-column: 1;">
@@ -624,8 +571,9 @@ export class EwtInstallDialog extends LitElement {
       <label>WiFi SSID 2:</label>
     </div>
     <div style="grid-column: 3;">
-      <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
-        <option value="">--select SSID--</option>
+      <select id="wifiSSID2" name="wifiSSID2" @click=${() => this._updateSsids()}>
+        <option value="">--select SSID 2--</option>
+        ${this._ssids.map(info => html`<option value="${info.name}">${info.name}</option>`)}
       </select>
     </div>
     <div style="grid-column: 1;">
@@ -634,16 +582,16 @@ export class EwtInstallDialog extends LitElement {
     <div style="grid-column: 3;">
       <input type="text" name="wifiPwd2" value="" />
     </div>
-    </form>
-    <ewt-button
-      slot="primaryAction"
-      label="Save Configuration"
-      @click=${this._saveConfiguration}
-    ></ewt-button>
+  </form>
+  <ewt-button
+    slot="primaryAction"
+    label="Save Configuration"
+    @click=${this._saveConfiguration}
+  ></ewt-button>
   `;
-  
-    return [heading, content, hideActions];
-  }
+
+  return [heading, content, hideActions];
+}
 
   private async _scanSSIDs() {
     const id = "1";
@@ -821,12 +769,20 @@ private async _pauseWifiTask() {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
-    // Create a new FormData instance
     let formData = new FormData(form);
   
-    // Convert formData to an object
+    // Convert formData to an object, prioritizing manual SSID input
     let object: any = {};
-    formData.forEach((value, key) => { object[key] = value });
+    formData.forEach((value, key) => {
+      // If a manual SSID input is provided, use it over the dropdown
+      if (key === 'wifiSSIDManual' && value) {
+        object['wifiSSID'] = value; // Assuming 'wifiSSID' is the key used in your configuration
+      } else if (!object['wifiSSID'] || key !== 'wifiSSIDManual') {
+        // Only set the value if 'wifiSSID' hasn't been set by the manual input
+        // This avoids overwriting the manual input with the dropdown value
+        object[key] = value;
+      }
+    });
 
     delete object.expertMode;
   
@@ -1363,7 +1319,7 @@ private async _pauseWifiTask() {
     } catch (err) {
       // When we fail while loading, pick "Join other"
       if (this._ssids === undefined) {
-        this._ssids = null;
+        this._ssids = [];
         this._selectedSsid = null;
       }
       this._busy = false;
@@ -1406,7 +1362,6 @@ private async _pauseWifiTask() {
   protected override firstUpdated(changedProps: PropertyValues) {
     super.firstUpdated(changedProps);
     this._initialize();
-    this._initialScanForSsids();
   }
 
   protected override updated(changedProps: PropertyValues) {
@@ -1677,3 +1632,4 @@ declare global {
     "ewt-install-dialog": EwtInstallDialog;
   }
 }
+
