@@ -473,24 +473,13 @@ export class EwtInstallDialog extends LitElement {
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
     this._initialScanForSsids();  // Prepopulate the SSID list when the configuration form is initialized
-
+  
     let heading: string | undefined = `Configuration`;
     let content: TemplateResult;
     let hideActions = false;
   
     // Use this._currencies instead of fetching the currencies
     let currencies: string[] = this._currencies;
-
-    // Initialize the "Existing Devices" selector to the "Select a configuration" state
-    let configSelector = this.shadowRoot!.querySelector('select[name="existingConfigs"]') as HTMLSelectElement;
-    if (configSelector) {
-      let event = new Event('change');
-      Object.defineProperty(event, 'target', { 
-        writable: false, 
-        value: configSelector 
-      });
-      this._handleConfigChange(event);
-    } 
   
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
@@ -505,13 +494,13 @@ export class EwtInstallDialog extends LitElement {
           <label>API Key:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
+          <input type="text" name="apiKey" value="BueokH4o3FmhWmbvqyqLKz" />
         </div>
         <div style="grid-column: 1;">
           <label>Callback URL:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="callbackUrl" value="https://${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
+          <input type="text" name="callbackUrl" value="https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/hTUMG" />
         </div>
         <div style="grid-column: 1;">
           <label>Fiat Precision:</label>
@@ -551,27 +540,39 @@ export class EwtInstallDialog extends LitElement {
             ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
           </select>
         </div>
-      ` : html``}
+        ` : html`
+        <div style="grid-column: 1;">
+          <label>Select Configuration:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <select name="existingConfigs" @change=${this._handleConfigChange}>
+            ${this._existingConfigs.map(config => html`
+              <option value="${config.id}">${config.title}</option>
+            `)}
+            <option value="createNewDevice" selected>Create New Device</option>
+          </select>
+        </div>
+      `}
       <div style="grid-column: 1;">
-      <label>WiFi SSID:</label>
-    </div>
-    <div style="grid-column: 3;">
-      <select id="wifiSSID" name="wifiSSID" @click=${() => this._updateSsids()}>
-        <option value="">--select SSID--</option>
-        ${this._ssids.map(info => html`<option value="${info.name}">${info.name}</option>`)}
-      </select>
-    </div>
-    <div style="grid-column: 1;">
-      <label>WiFi Password:</label>
-    </div>
-    <div style="grid-column: 3;">
-      <input type="text" name="wifiPwd" value="" />
-    </div>
-    <div style="grid-column: 1;">
+        <label>WiFi SSID:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <select id="wifiSSID" name="wifiSSID" @focus=${() => this._updateSsids()}>
+          <option value="">--select SSID--</option>
+          ${this._ssids.map(info => html`<option value="${info.name}">${info.name}</option>`)}
+        </select>
+      </div>
+      <div style="grid-column: 1;">
+        <label>WiFi Password:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <input type="text" name="wifiPwd" value="" />
+      </div>
+      <div style="grid-column: 1;">
       <label>WiFi SSID 2:</label>
     </div>
     <div style="grid-column: 3;">
-      <select id="wifiSSID2" name="wifiSSID2" @click=${() => this._updateSsids()}>
+      <select id="wifiSSID2" name="wifiSSID2" @focus=${() => this._updateSsids()}>
         <option value="">--select SSID 2--</option>
         ${this._ssids.map(info => html`<option value="${info.name}">${info.name}</option>`)}
       </select>
@@ -589,9 +590,9 @@ export class EwtInstallDialog extends LitElement {
     @click=${this._saveConfiguration}
   ></ewt-button>
   `;
-
+  
   return [heading, content, hideActions];
-}
+}  
 
   private async _scanSSIDs() {
     const id = "1";
@@ -734,30 +735,6 @@ private async _pauseWifiTask() {
     throw new Error("Serial port is not open or readable");
   }
 }
-
-  private async _handleSSIDClick(event: Event) {
-    const dropdown = event.target as HTMLSelectElement;
-    if (dropdown.options.length === 1) {
-      try {
-          const scanResponse = await this._scanSSIDs();
-          // Check if 'result' is a string and parse it as JSON to get the array
-          const ssids = typeof scanResponse.result === 'string' ? JSON.parse(scanResponse.result) : scanResponse.result;
-
-          if (Array.isArray(ssids)) {
-            ssids.forEach((ssid: string) => {
-              const option = document.createElement('option');
-              option.value = ssid;
-              option.text = ssid;
-              dropdown.add(option);
-            });
-          } else {
-            console.error('The "result" field does not contain an array:', ssids);
-          }
-      } catch (error) {
-        console.error('Error handling SSID click:', error);
-      }
-    }
-  }
 
   private _toggleExpertMode(event: Event) {
     const checkbox = event.target as HTMLInputElement;
@@ -1315,7 +1292,7 @@ private async _pauseWifiTask() {
     let ssids: Ssid[];
   
     try {
-      ssids = await this._client!.scan();
+      ssids = await this._scanSSIDs(); 
     } catch (err) {
       // When we fail while loading, pick "Join other"
       if (this._ssids === undefined) {
