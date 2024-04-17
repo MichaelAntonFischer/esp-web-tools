@@ -707,7 +707,7 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions];
   }
 
-  private async _scanSSIDs() {
+  private async _scanSSIDs(): Promise<any> {
     const id = "1";
     const jsonRpcVersion = "2.0";
   
@@ -770,7 +770,13 @@ export class EwtInstallDialog extends LitElement {
         const response = JSON.parse(completeData);
         // Log the parsed response
         console.log("Parsed JSON response:", response);
-        return response;
+        // Check if the parsed response is the same as the data sent
+        if (JSON.stringify(response) === JSON.stringify(data)) {
+          // If it is, ignore it and continue reading until you get a different response
+          return this._scanSSIDs();
+        } else {
+          return response;
+        }
       } else {
         throw new Error("No JSON data received from the serial port");
       }
