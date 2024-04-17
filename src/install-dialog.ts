@@ -754,14 +754,16 @@ export class EwtInstallDialog extends LitElement {
             let response = jsonResponses.find(resp => JSON.stringify(resp) !== JSON.stringify(data));
             if (response) {
               console.log("Parsed JSON response:", response);
+              reader.releaseLock(); // Release the reader lock before returning
               return response;
             }
           }
         }
-        reader.releaseLock();
+        reader.releaseLock(); // Release the reader lock if no valid response is found
         throw new Error("No valid JSON response received from the serial port");
       } catch (error) {
         console.error('Error reading from serial port:', error);
+        reader.releaseLock(); // Release the reader lock in case of an error
         throw error;
       }
     } else {
