@@ -722,7 +722,7 @@ export class EwtInstallDialog extends LitElement {
     if (this.port && this.port.writable) {
       const writer = this.port.writable.getWriter();
       const encoder = new TextEncoder();
-      const dataStr = JSON.stringify(data) + "\n"; // Ensure there's a newline at the end
+      const dataStr = JSON.stringify(data) + "\n";
       const encodedData = encoder.encode(dataStr);
       await writer.write(encodedData);
       writer.releaseLock();
@@ -730,64 +730,65 @@ export class EwtInstallDialog extends LitElement {
       throw new Error("Serial port is not open or writable");
     }
   
-  // Read the response from the serial port
-  if (this.port && this.port.readable) {
-    const reader = this.port.readable.getReader();
-    try {
-      let completeData = '';
-      let jsonStarted = false;
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          // The stream has been closed or we finished reading.
-          break;
+    // Read the response from the serial port
+    if (this.port && this.port.readable) {
+      const reader = this.port.readable.getReader();
+      try {
+        let completeData = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            break;
+          }
+          const textDecoder = new TextDecoder();
+          const chunk = textDecoder.decode(value, { stream: true });
+          completeData += chunk;
+  
+          // Check if the complete data contains one or more complete JSON responses
+          let jsonResponses = this.extractJsonResponses(completeData);
+          if (jsonResponses.length > 0) {
+            // Remove the parsed JSON responses from the complete data
+            completeData = completeData.slice(completeData.lastIndexOf('}') + 1);
+            
+            // Find the response that is different from the sent data
+            let response = jsonResponses.find(resp => JSON.stringify(resp) !== JSON.stringify(data));
+            if (response) {
+              console.log("Parsed JSON response:", response);
+              return response;
+            }
+          }
         }
-        const textDecoder = new TextDecoder();
-        const chunk = textDecoder.decode(value, { stream: true });
-        completeData += chunk;
-
-        // Check if the JSON data starts (assuming JSON starts with '{')
-        if (chunk.includes('{')) {
-          jsonStarted = true;
-          // Trim the data from the start to the first '{'
-          completeData = completeData.substring(completeData.indexOf('{'));
-        }
-
-        // If JSON has started and we find the end of JSON (assuming it ends with '}')
-        if (jsonStarted && chunk.includes('}')) {
-          // Trim the data from the end of JSON to the end
-          completeData = completeData.substring(0, completeData.lastIndexOf('}') + 1);
-          break;
-        }
+        reader.releaseLock();
+        throw new Error("No valid JSON response received from the serial port");
+      } catch (error) {
+        console.error('Error reading from serial port:', error);
+        throw error;
       }
-      reader.releaseLock();
-
-      // Log the complete data for debugging
-      console.log("Complete data received from serial port:", completeData);
-
-      if (jsonStarted) {
-        // Parse the JSON data
-        const response = JSON.parse(completeData);
-        // Log the parsed response
-        console.log("Parsed JSON response:", response);
-        // Check if the parsed response is the same as the data sent
-        if (JSON.stringify(response) === JSON.stringify(data)) {
-          // If it is, ignore it and continue reading until you get a different response
-          return this._scanSSIDs();
-        } else {
-          return response;
-        }
-      } else {
-        throw new Error("No JSON data received from the serial port");
-      }
-    } catch (error) {
-      console.error('Error reading from serial port:', error);
-      throw error;
+    } else {
+      throw new Error("Serial port is not open or readable");
     }
-  } else {
-    throw new Error("Serial port is not open or readable");
   }
-}
+  
+  private extractJsonResponses(data: string): any[] {
+    let jsonResponses = [];
+    let startIndex = data.indexOf('{');
+    while (startIndex !== -1) {
+      let endIndex = data.indexOf('}', startIndex);
+      if (endIndex !== -1) {
+        let jsonString = data.substring(startIndex, endIndex + 1);
+        try {
+          let jsonObject = JSON.parse(jsonString);
+          jsonResponses.push(jsonObject);
+        } catch (error) {
+          // Ignore parse errors and continue searching
+        }
+        startIndex = data.indexOf('{', endIndex);
+      } else {
+        break;
+      }
+    }
+    return jsonResponses;
+  }
 
 private async _pauseWifiTask() {
   const id = "1";
