@@ -1,4 +1,5 @@
 import { LitElement, html, PropertyValues, css, TemplateResult } from "lit";
+import { property, customElement } from 'lit-element';
 import { state } from "lit/decorators.js";
 import "./components/ewt-button";
 import "./components/ewt-checkbox";
@@ -98,36 +99,14 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _existingConfigs: any[] = [];
 
+  // Global variable to store SSIDs
+  @property({ type: Array })
+  availableSSIDs: string[] = []; // Reactive property to store SSIDs
+
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
   }
-  // Fetching currencies from server is currently disabled
-  // private async _fetchCurrencies() {
-  //   try {
-  //     const response = await fetch('https://${domain}/api/v1/currencies', {
-  //       method: 'GET',
-  //       headers: {
-  //         'Accept': 'application/json',
-  //       },
-  //     });
-  // 
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-  // 
-  //     const fetchedCurrencies = await response.json();
-  //     this._currencies = ['EUR', 'USD', 'CHF', ...fetchedCurrencies];
-  //   } catch (e) {
-  //     // If there is an error fetching the currencies, we still show EUR, USD and CHF
-  //     this._currencies = ['EUR', 'USD', 'CHF'];
-  //     if (e instanceof Error) {
-  //       this.logger.error("There was an error fetching the currencies: ", e.message);
-  //     } else {
-  //       this.logger.error("There was an error fetching the currencies: ", e);
-  //     }
-  //   }
-  // }
 
   private async _fetchConfigs() {
     const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
@@ -183,7 +162,6 @@ export class EwtInstallDialog extends LitElement {
     }
   }
   
-
   private async _createNewDevice() {
     let title: string = '';
     let currency: string = '';
@@ -240,6 +218,63 @@ export class EwtInstallDialog extends LitElement {
   };
 }
 
+  private async _handleSSIDClick(event: Event) {
+    const target = event.target as HTMLSelectElement | null;
+    if (!target) {
+      console.error("Failed to retrieve the select element.");
+      return;
+    }
+
+    const isManualEntrySelected = target.value === "manual";
+    const manualInputId = target.id === "wifiSSID" ? "manualSSID" : "manualSSID2";
+    const manualInput = this.shadowRoot?.querySelector(`#${manualInputId}`) as HTMLInputElement | null;
+
+    if (!manualInput) {
+      console.error(`Failed to retrieve the manual input element for ${manualInputId}.`);
+      return;
+    }
+
+    if (isManualEntrySelected) {
+      manualInput.style.display = ''; // Show the manual entry input
+      target.style.display = 'none'; // Optionally hide the dropdown
+    } else {
+      // Populate dropdown if it's not already populated
+      if (target.options.length <= 2) { // Assuming 'select SSID' and 'Enter Manually' are the only initial options
+        await this.populateDropdownWithSSIDs(target);
+      }
+    }
+  }
+
+  private async populateDropdownWithSSIDs(dropdown: HTMLSelectElement) {
+    try {
+      const scanResponse = await this._scanSSIDs();
+      const ssids = typeof scanResponse === 'string' ? JSON.parse(scanResponse) : scanResponse;
+
+      if (Array.isArray(ssids)) {
+        ssids.forEach(ssid => this.availableSSIDs.add(ssid));
+        this.updateDropdownOptions(dropdown);
+      } else {
+        console.log("No SSIDs found.");
+      }
+    } catch (error) {
+      console.error("Failed to scan SSIDs:", error);
+    }
+  }
+
+  private updateDropdownOptions(dropdown: HTMLSelectElement) {
+    // Clear existing options except the first two
+    while (dropdown.options.length > 2) {
+      dropdown.remove(2);
+    }
+
+    // Add new SSID options from the set
+    this.availableSSIDs.forEach(ssid => {
+      const option = document.createElement('option');
+      option.value = ssid;
+      option.text = ssid;
+      dropdown.add(option);
+    });
+  }
 
   protected render() {
     if (!this.port) {
@@ -609,10 +644,13 @@ export class EwtInstallDialog extends LitElement {
       <div style="grid-column: 1;">
       <label>WiFi SSID:</label>
     </div>
-    <div style="grid-column: 3;">
+      <div style="grid-column: 3;">
       <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
         <option value="">--select SSID--</option>
+        ${Array.from(this.availableSSIDs).map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+        <option value="manual">Enter Manually</option>
       </select>
+      <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
     </div>
     <div style="grid-column: 1;">
       <label>WiFi Password:</label>
@@ -626,7 +664,10 @@ export class EwtInstallDialog extends LitElement {
     <div style="grid-column: 3;">
       <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
         <option value="">--select SSID--</option>
+        ${Array.from(this.availableSSIDs).map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+        <option value="manual">Enter Manually</option>
       </select>
+      <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
     </div>
     <div style="grid-column: 1;">
       <label>WiFi Password 2:</label>
@@ -786,30 +827,6 @@ private async _pauseWifiTask() {
     throw new Error("Serial port is not open or readable");
   }
 }
-
-  private async _handleSSIDClick(event: Event) {
-    const dropdown = event.target as HTMLSelectElement;
-    if (dropdown.options.length === 1) {
-      try {
-          const scanResponse = await this._scanSSIDs();
-          // Check if 'result' is a string and parse it as JSON to get the array
-          const ssids = typeof scanResponse.result === 'string' ? JSON.parse(scanResponse.result) : scanResponse.result;
-
-          if (Array.isArray(ssids)) {
-            ssids.forEach((ssid: string) => {
-              const option = document.createElement('option');
-              option.value = ssid;
-              option.text = ssid;
-              dropdown.add(option);
-            });
-          } else {
-            console.error('The "result" field does not contain an array:', ssids);
-          }
-      } catch (error) {
-        console.error('Error handling SSID click:', error);
-      }
-    }
-  }
 
   private _toggleExpertMode(event: Event) {
     const checkbox = event.target as HTMLInputElement;
