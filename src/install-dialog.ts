@@ -1,6 +1,5 @@
 import { LitElement, html, PropertyValues, css, TemplateResult } from "lit";
-import { property, customElement } from 'lit-element';
-import { state } from "lit/decorators.js";
+import { property, customElement, state } from 'lit/decorators.js';
 import "./components/ewt-button";
 import "./components/ewt-checkbox";
 import "./components/ewt-console";
@@ -45,6 +44,7 @@ const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 
+@customElement('ewt-install-dialog')
 export class EwtInstallDialog extends LitElement {
   public port!: SerialPort;
 
@@ -64,6 +64,9 @@ export class EwtInstallDialog extends LitElement {
   private _manifest!: Manifest;
 
   private _info?: ImprovSerial["info"];
+
+  @state()
+  private scanningSSIDs: boolean = false; // Flag to indicate if SSID scan is in progress
 
   // null = NOT_SUPPORTED
   @state() private _client?: ImprovSerial | null;
@@ -229,51 +232,43 @@ export class EwtInstallDialog extends LitElement {
     const manualInputId = target.id === "wifiSSID" ? "manualSSID" : "manualSSID2";
     const manualInput = this.shadowRoot?.querySelector(`#${manualInputId}`) as HTMLInputElement | null;
 
-    if (!manualInput) {
-      console.error(`Failed to retrieve the manual input element for ${manualInputId}.`);
-      return;
-    }
-
     if (isManualEntrySelected) {
-      manualInput.style.display = ''; // Show the manual entry input
-      target.style.display = 'none'; // Optionally hide the dropdown
+      if (manualInput) {
+        manualInput.style.display = '';
+      }
+      target.style.display = 'none';
     } else {
-      // Populate dropdown if it's not already populated
-      if (target.options.length <= 2) { // Assuming 'select SSID' and 'Enter Manually' are the only initial options
-        await this.populateDropdownWithSSIDs(target);
+      if (target.options.length <= 2 && !this.scanningSSIDs) { // Check if scan is not already in progress
+        this.scanningSSIDs = true;
+        await this.populateDropdownWithSSIDs();
+        this.scanningSSIDs = false;
       }
     }
   }
 
-  private async populateDropdownWithSSIDs(dropdown: HTMLSelectElement) {
+  private async populateDropdownWithSSIDs() {
     try {
-      const scanResponse = await this._scanSSIDs();
-      const ssids = typeof scanResponse === 'string' ? JSON.parse(scanResponse) : scanResponse;
+        const response = await this._scanSSIDs();  // Assuming this returns the JSON directly
+        if (response && response.result) {
+            const ssids = JSON.parse(response.result);
+            console.log('Parsed SSIDs:', ssids);  // Confirm parsed SSIDs
 
-      if (Array.isArray(ssids)) {
-        ssids.forEach(ssid => this.availableSSIDs.add(ssid));
-        this.updateDropdownOptions(dropdown);
-      } else {
-        console.log("No SSIDs found.");
-      }
+            if (ssids.length > 0) {
+                const newSet = new Set([...this.availableSSIDs, ...ssids]);
+                this.availableSSIDs = Array.from(newSet);
+                console.log('Updated SSIDs:', this.availableSSIDs);  // Log the updated array
+                this.requestUpdate(); // Trigger update to re-render the component
+            } else {
+                console.log('No new SSIDs found');
+            }
+        } else {
+            console.log('Response did not contain SSIDs:', response);
+        }
     } catch (error) {
-      console.error("Failed to scan SSIDs:", error);
+        console.error("Failed to process SSIDs:", error);
+    } finally {
+        this.scanningSSIDs = false;
     }
-  }
-
-  private updateDropdownOptions(dropdown: HTMLSelectElement) {
-    // Clear existing options except the first two
-    while (dropdown.options.length > 2) {
-      dropdown.remove(2);
-    }
-
-    // Add new SSID options from the set
-    this.availableSSIDs.forEach(ssid => {
-      const option = document.createElement('option');
-      option.value = ssid;
-      option.text = ssid;
-      dropdown.add(option);
-    });
   }
 
   protected render() {
@@ -535,6 +530,21 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions, allowClosing];
   }
 
+  private async ensureSSIDsAreUpdated() {
+    let attempts = 0;
+    const maxAttempts = 6; // Set a maximum number of attempts to prevent infinite loops
+    while (this.availableSSIDs.length === 0 && attempts < maxAttempts) {
+        await this.populateDropdownWithSSIDs();
+        attempts++;
+        if (this.availableSSIDs.length > 0) {
+            break; // Exit the loop if SSIDs are found
+        }
+    }
+    if (attempts >= maxAttempts) {
+        console.log("Maximum attempts reached without finding SSIDs.");
+    }
+}
+
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
     let heading: string | undefined = `Configuration`;
@@ -641,34 +651,36 @@ export class EwtInstallDialog extends LitElement {
           </select>
         </div>
       `}
+      <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
-      <label>WiFi SSID:</label>
-    </div>
+        <label>WiFi SSID:</label>
+      </div>
       <div style="grid-column: 3;">
-      <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
-        <option value="">--select SSID--</option>
-        ${Array.from(this.availableSSIDs).map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-        <option value="manual">Enter Manually</option>
-      </select>
-      <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
-    </div>
+        <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
+          <option value="">--select SSID--</option>
+          ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+          <option value="manual">Enter Manually</option>
+        </select>
+        <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
+      </div>
     <div style="grid-column: 1;">
       <label>WiFi Password:</label>
     </div>
     <div style="grid-column: 3;">
       <input type="text" name="wifiPwd" value="" />
     </div>
-    <div style="grid-column: 1;">
-      <label>WiFi SSID 2:</label>
-    </div>
-    <div style="grid-column: 3;">
-      <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
-        <option value="">--select SSID--</option>
-        ${Array.from(this.availableSSIDs).map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-        <option value="manual">Enter Manually</option>
-      </select>
-      <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
-    </div>
+    <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
+      <div style="grid-column: 1;">
+        <label>WiFi SSID2:</label>
+      </div>
+      <div style="grid-column: 3;">
+        <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
+          <option value="">--select SSID--</option>
+          ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+          <option value="manual">Enter Manually</option>
+        </select>
+        <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
+      </div>
     <div style="grid-column: 1;">
       <label>WiFi Password 2:</label>
     </div>
@@ -1425,6 +1437,7 @@ private async _pauseWifiTask() {
   
       if (this._state === "CONFIGURE") {
         this._fetchCurrencies();
+        this.ensureSSIDsAreUpdated();
       } else if (this._state === "PROVISION") {
         if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
           // If we pick "Join other", select SSID input.
@@ -1685,3 +1698,4 @@ declare global {
     "ewt-install-dialog": EwtInstallDialog;
   }
 }
+
