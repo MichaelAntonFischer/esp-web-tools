@@ -238,10 +238,8 @@ export class EwtInstallDialog extends LitElement {
       }
       target.style.display = 'none';
     } else {
-      if (target.options.length <= 2 && !this.scanningSSIDs) { // Check if scan is not already in progress
-        this.scanningSSIDs = true;
+      if (!this.scanningSSIDs) { // Check if scan is not already in progress
         await this._populateDropdownWithSSIDs();
-        this.scanningSSIDs = false;
       }
     }
   }
@@ -536,10 +534,8 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _ensureSSIDsAreUpdated() {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Adding a 1 second delay before starting the process
     let attempts = 0;
-    const maxAttempts = 12; // Set a maximum number of attempts to prevent infinite loops
-    this.scanningSSIDs = true; // Ensure scanning flag is set to true at the beginning
+    const maxAttempts = 6; // Set a maximum number of attempts to prevent infinite loops
     try {
       while (this.availableSSIDs.length === 0 && attempts < maxAttempts) {
           await this._populateDropdownWithSSIDs();
