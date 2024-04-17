@@ -1,5 +1,5 @@
 import { LitElement, html, PropertyValues, css, TemplateResult } from "lit";
-import { state } from "lit/decorators.js";
+import { property, customElement, state } from 'lit/decorators.js';
 import "./components/ewt-button";
 import "./components/ewt-checkbox";
 import "./components/ewt-console";
@@ -40,11 +40,11 @@ console.log(
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
-const domain = 'devapi.opago-pay.com';
-
+const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago-pay.com' : 'api.opago-pay.com';
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 
+@customElement('ewt-install-dialog')
 export class EwtInstallDialog extends LitElement {
   public port!: SerialPort;
 
@@ -64,6 +64,9 @@ export class EwtInstallDialog extends LitElement {
   private _manifest!: Manifest;
 
   private _info?: ImprovSerial["info"];
+
+  @state()
+  private scanningSSIDs: boolean = false; // Flag to indicate if SSID scan is in progress
 
   // null = NOT_SUPPORTED
   @state() private _client?: ImprovSerial | null;
@@ -99,33 +102,29 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _existingConfigs: any[] = [];
 
+  // Global variable to store SSIDs
+  @property({ type: Array })
+  availableSSIDs: string[] = []; // Reactive property to store SSIDs
+
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
   }
-  
+
   private async _fetchConfigs() {
-    if (!api_key) {
-      console.warn('API key is not available, skipping fetch configs.');
-      return;
-    }
-    try {
-      const response = await fetch(`${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
+    const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
   
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      // Store the entire configuration objects, not just the ids
-      this._existingConfigs = await response.json();
-    } catch (err) {
-      console.error("Error fetching configs:", err);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+  
+    // Store the entire configuration objects, not just the ids
+    this._existingConfigs = await response.json();
   }
 
   private _handleConfigChange(event: Event) {
@@ -166,7 +165,6 @@ export class EwtInstallDialog extends LitElement {
     }
   }
   
-
   private async _createNewDevice() {
     let title: string = '';
     let currency: string = '';
@@ -198,7 +196,7 @@ export class EwtInstallDialog extends LitElement {
       ]
     };
   
-    const response = await fetch(`${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -219,10 +217,59 @@ export class EwtInstallDialog extends LitElement {
   // Once the new device is created, return an object with the necessary properties
   return {
     apiKey: newDevice.key, // replace 'apiKey' with the actual property name for the API key in the newDevice object
-    callbackUrl: `https://lnbits.opago-pay.com/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    callbackUrl: `https://${domain}/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
   };
 }
 
+  private async _handleSSIDClick(event: Event) {
+    const target = event.target as HTMLSelectElement | null;
+    if (!target) {
+      console.error("Failed to retrieve the select element.");
+      return;
+    }
+
+    const isManualEntrySelected = target.value === "manual";
+    const manualInputId = target.id === "wifiSSID" ? "manualSSID" : "manualSSID2";
+    const manualInput = this.shadowRoot?.querySelector(`#${manualInputId}`) as HTMLInputElement | null;
+
+    if (isManualEntrySelected) {
+      if (manualInput) {
+        manualInput.style.display = '';
+      }
+      target.style.display = 'none';
+    } else {
+      if (target.options.length <= 2 && !this.scanningSSIDs) { // Check if scan is not already in progress
+        this.scanningSSIDs = true;
+        await this.populateDropdownWithSSIDs();
+        this.scanningSSIDs = false;
+      }
+    }
+  }
+
+  private async populateDropdownWithSSIDs() {
+    try {
+        const response = await this._scanSSIDs();  // Assuming this returns the JSON directly
+        if (response && response.result) {
+            const ssids = JSON.parse(response.result);
+            console.log('Parsed SSIDs:', ssids);  // Confirm parsed SSIDs
+
+            if (ssids.length > 0) {
+                const newSet = new Set([...this.availableSSIDs, ...ssids]);
+                this.availableSSIDs = Array.from(newSet);
+                console.log('Updated SSIDs:', this.availableSSIDs);  // Log the updated array
+                this.requestUpdate(); // Trigger update to re-render the component
+            } else {
+                console.log('No new SSIDs found');
+            }
+        } else {
+            console.log('Response did not contain SSIDs:', response);
+        }
+    } catch (error) {
+        console.error("Failed to process SSIDs:", error);
+    } finally {
+        this.scanningSSIDs = false;
+    }
+  }
 
   protected render() {
     if (!this.port) {
@@ -483,19 +530,20 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions, allowClosing];
   }
 
-  // This method handles changes to the SSID dropdown
-  private _handleSsidChange(event: Event) {
-    const selectElement = event.target as HTMLSelectElement;
-    const ssidInput = this.shadowRoot!.querySelector('input[name="wifiSSID"]') as HTMLInputElement;
-    ssidInput.value = selectElement.value;
-    this._selectedSsid = selectElement.value;
-  }
-  
-  // This method handles input into the SSID text field
-  private _handleSsidInput(event: Event) {
-    const inputElement = event.target as HTMLInputElement;
-    this._selectedSsid = inputElement.value;
-  }
+  private async ensureSSIDsAreUpdated() {
+    let attempts = 0;
+    const maxAttempts = 6; // Set a maximum number of attempts to prevent infinite loops
+    while (this.availableSSIDs.length === 0 && attempts < maxAttempts) {
+        await this.populateDropdownWithSSIDs();
+        attempts++;
+        if (this.availableSSIDs.length > 0) {
+            break; // Exit the loop if SSIDs are found
+        }
+    }
+    if (attempts >= maxAttempts) {
+        console.log("Maximum attempts reached without finding SSIDs.");
+    }
+}
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
@@ -516,15 +564,7 @@ export class EwtInstallDialog extends LitElement {
       });
       this._handleConfigChange(event);
     } 
-
-    // Define the ssidDropdown template
-    const ssidDropdown = html`
-      <select @change=${this._handleSsidChange}>
-        <option value="">--Select Network--</option>
-        ${this._ssids ? this._ssids.map(ssid => html`<option value=${ssid}>${ssid}</option>`) : ''}
-      </select>
-    `;
-
+  
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
@@ -544,7 +584,7 @@ export class EwtInstallDialog extends LitElement {
           <label>Callback URL:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="callbackUrl" value="${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
+          <input type="text" name="callbackUrl" value="https://${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
         </div>
         <div style="grid-column: 1;">
           <label>Fiat Precision:</label>
@@ -611,23 +651,42 @@ export class EwtInstallDialog extends LitElement {
           </select>
         </div>
       `}
+      <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
         <label>WiFi SSID:</label>
       </div>
       <div style="grid-column: 3;">
-        <!-- Include the ssidDropdown in the UI -->
-        ${ssidDropdown}
-        <!-- Text input for manual SSID entry -->
-        <input type="text" name="wifiSSID" .value=${this._selectedSsid || ''} @input=${this._handleSsidInput} />
-        <!-- Scan button to trigger network scanning -->
-        <ewt-button @click=${() => this._scanSSIDs()} label="Scan WiFi"></ewt-button>
+        <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
+          <option value="">--select SSID--</option>
+          ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+          <option value="manual">Enter Manually</option>
+        </select>
+        <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
       </div>
+    <div style="grid-column: 1;">
+      <label>WiFi Password:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <input type="text" name="wifiPwd" value="" />
+    </div>
+    <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
-        <label>WiFi Password:</label>
+        <label>WiFi SSID2:</label>
       </div>
       <div style="grid-column: 3;">
-        <input type="text" name="wifiPwd" value="" />
+        <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
+          <option value="">--select SSID--</option>
+          ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+          <option value="manual">Enter Manually</option>
+        </select>
+        <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
       </div>
+    <div style="grid-column: 1;">
+      <label>WiFi Password 2:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <input type="text" name="wifiPwd2" value="" />
+    </div>
     </form>
     <ewt-button
       slot="primaryAction"
@@ -639,6 +698,148 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions];
   }
 
+  private async _scanSSIDs() {
+    const id = "1";
+    const jsonRpcVersion = "2.0";
+  
+    const data = {
+      "jsonrpc": jsonRpcVersion,
+      "id": id,
+      "method": "scanSSIDs",
+      "params": {}
+    };
+  
+    // Write the data to the serial port
+    if (this.port && this.port.writable) {
+      const writer = this.port.writable.getWriter();
+      const encoder = new TextEncoder();
+      const dataStr = JSON.stringify(data) + "\n"; // Ensure there's a newline at the end
+      const encodedData = encoder.encode(dataStr);
+      await writer.write(encodedData);
+      writer.releaseLock();
+    } else {
+      throw new Error("Serial port is not open or writable");
+    }
+  
+  // Read the response from the serial port
+  if (this.port && this.port.readable) {
+    const reader = this.port.readable.getReader();
+    try {
+      let completeData = '';
+      let jsonStarted = false;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          // The stream has been closed or we finished reading.
+          break;
+        }
+        const textDecoder = new TextDecoder();
+        const chunk = textDecoder.decode(value, { stream: true });
+        completeData += chunk;
+
+        // Check if the JSON data starts (assuming JSON starts with '{')
+        if (chunk.includes('{')) {
+          jsonStarted = true;
+          // Trim the data from the start to the first '{'
+          completeData = completeData.substring(completeData.indexOf('{'));
+        }
+
+        // If JSON has started and we find the end of JSON (assuming it ends with '}')
+        if (jsonStarted && chunk.includes('}')) {
+          // Trim the data from the end of JSON to the end
+          completeData = completeData.substring(0, completeData.lastIndexOf('}') + 1);
+          break;
+        }
+      }
+      reader.releaseLock();
+
+      // Log the complete data for debugging
+      console.log("Complete data received from serial port:", completeData);
+
+      if (jsonStarted) {
+        // Parse the JSON data
+        const response = JSON.parse(completeData);
+        // Log the parsed response
+        console.log("Parsed JSON response:", response);
+        return response;
+      } else {
+        throw new Error("No JSON data received from the serial port");
+      }
+    } catch (error) {
+      console.error('Error reading from serial port:', error);
+      throw error;
+    }
+  } else {
+    throw new Error("Serial port is not open or readable");
+  }
+}
+
+private async _pauseWifiTask() {
+  const id = "1";
+  const jsonRpcVersion = "2.0";
+
+  const data = {
+    "jsonrpc": jsonRpcVersion,
+    "id": id,
+    "method": "pauseWifiTask",
+    "params": {}
+  };
+
+  // Write the data to the serial port
+  if (this.port && this.port.writable) {
+    const writer = this.port.writable.getWriter();
+    const encoder = new TextEncoder();
+    const dataStr = JSON.stringify(data) + "\n";
+    const encodedData = encoder.encode(dataStr);
+    await writer.write(encodedData);
+    writer.releaseLock();
+  } else {
+    throw new Error("Serial port is not open or writable");
+  }
+
+  // Read the response from the serial port
+  if (this.port && this.port.readable) {
+    const reader = this.port.readable.getReader();
+    try {
+      let completeData = '';
+      let jsonStarted = false;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        const textDecoder = new TextDecoder();
+        const chunk = textDecoder.decode(value, { stream: true });
+        completeData += chunk;
+
+        if (chunk.includes('{')) {
+          jsonStarted = true;
+          completeData = completeData.substring(completeData.indexOf('{'));
+        }
+
+        if (jsonStarted && chunk.includes('}')) {
+          completeData = completeData.substring(0, completeData.lastIndexOf('}') + 1);
+          break;
+        }
+      }
+      reader.releaseLock();
+
+      if (jsonStarted) {
+        const response = JSON.parse(completeData);
+        console.log("Pause WiFi task response:", response);
+        return response;
+      } else {
+        throw new Error("No JSON data received from the serial port");
+      }
+    } catch (error) {
+      console.error('Error reading from serial port:', error);
+      throw error;
+    }
+  } else {
+    throw new Error("Serial port is not open or readable");
+  }
+}
+
   private _toggleExpertMode(event: Event) {
     const checkbox = event.target as HTMLInputElement;
     this._expertMode = checkbox.checked;
@@ -649,31 +850,66 @@ export class EwtInstallDialog extends LitElement {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
+    // Create a new FormData instance
     let formData = new FormData(form);
+  
+    // Convert formData to an object
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
-    delete object.expertMode; // Always delete the expert mode flag
 
-    if (!this._expertMode) {
+    delete object.expertMode;
+  
+    // If expert mode is enabled, write the data to json exactly as entered by the user
+    if (this._expertMode) {
+      // No additional processing needed for expert mode
+    } else {
+      // Check if an existing configuration is selected
+      if (object.existingConfigs !== 'createNewDevice') {
+        // Find the selected configuration
+        const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
+  
+        if (selectedConfig) {
+          // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
+          object['apiKey.key'] = selectedConfig.key;
+          object['callbackUrl'] = `https://${domain}/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
+          object['fiatCurrency'] = selectedConfig.currency;
+          object['fiatPrecision'] = '2';
+          object['batteryMaxVolts'] = '4.2';
+          object['batteryMinVolts'] = '3.3';
+          object['contrastLevel'] = '75';
+          object['logLevel'] = 'info';
+  
+          // Remove the "existingConfigs" and "title" field
+          delete object.existingConfigs;
+          delete object.title;
+        }
+      }
+  
+      // Check if "Create New Device" is selected
       if (object.existingConfigs === 'createNewDevice') {
+        // Here we should call _createNewDevice method and update the form data accordingly
         const newDevice = await this._createNewDevice();
+        
         if (newDevice) {
           object['apiKey.key'] = newDevice.apiKey;
           object['callbackUrl'] = newDevice.callbackUrl;
-        }
-      } else {
-        const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
-        if (selectedConfig) {
-          object['apiKey.key'] = selectedConfig.apiKey;
-          object['callbackUrl'] = selectedConfig.callbackUrl;
+          object['fiatPrecision'] = '2';
+          object['batteryMaxVolts'] = '4.2';
+          object['batteryMinVolts'] = '3.3';
+          object['contrastLevel'] = '75';
+          object['logLevel'] = 'info';
+      
+          // Remove the "existingConfigs" and "title" field
+          delete object.existingConfigs;
+          delete object.title;
         }
       }
-
-      // Remove fields not needed for non-expert mode
-      delete object.existingConfigs;
-      delete object.title;
+  
+      if (object['fiatCurrency'] === 'sat') {
+        object['fiatPrecision'] = '0';
+      }
     }
-
+  
     // Prepare the data to be sent
     const data = {
       "jsonrpc": "2.0",
@@ -681,14 +917,25 @@ export class EwtInstallDialog extends LitElement {
       "method": "setconfig",
       "params": object
     };
-
+    // Check if the API key or callback url are blank
+    if (!data.params['apiKey.key'] || !data.params['callbackUrl']) {
+      alert('Creating Config Failed: API key or callback url are blank. Please reload the page and try again. If the problem reappears, contact support@opago-pay.com');
+      return;
+    }
+    
+    // Check if the API key or callback url are for demo mode
+    if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
+      if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
+        return;
+      }
+    }
     // Send the configuration to the ESP32 via JSON-RPC
     try {
       if (!this.port || this.port.readable === null || this.port.writable === null) {
         this.port = await navigator.serial.requestPort();
         await this.port.open({ baudRate: 115200 });
       }
-
+  
       if (this.port.writable) {
         const writer = this.port.writable.getWriter();
         const encoder = new TextEncoder();
@@ -700,7 +947,7 @@ export class EwtInstallDialog extends LitElement {
       } else {
         console.error('The port is not writable');
       } 
-
+  
       // Output the progress to a console-style window
       this._state = "LOGS";
       this.logger.log(`Configuration saved successfully.`);
@@ -827,7 +1074,7 @@ export class EwtInstallDialog extends LitElement {
           to connect to.
         </div>
         ${error ? html`<p class="error">${error}</p>` : ""}
-        ${this._ssids !== null && this._ssids !== undefined
+        ${this._ssids !== null
           ? html`
               <ewt-select
                 fixedMenuPosition
@@ -856,7 +1103,7 @@ export class EwtInstallDialog extends LitElement {
                   Join other…
                 </ewt-list-item>
               </ewt-select>
-              <ewt-icon-button @click=${this._scanSSIDs}>
+              <ewt-icon-button @click=${this._updateSsids}>
                 ${refreshIcon}
               </ewt-icon-button>
             `
@@ -1104,15 +1351,10 @@ export class EwtInstallDialog extends LitElement {
     }
     // Scan for SSIDs on provision
     if (this._state === "PROVISION") {
-      this._scanSSIDs();
+      this._updateSsids();
     } else {
       // Reset this value if we leave provisioning.
       this._provisionForce = false;
-    }
-
-    // Fetch currencies on configure
-    if (this._state === "CONFIGURE") {
-      this._fetchCurrencies();
     }
 
     if (this._state === "INSTALL") {
@@ -1121,57 +1363,99 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  private async _scanSSIDs() {
-    this._busy = true;
-    this.requestUpdate(); // Trigger UI update to reflect busy state
-  
+  private async _attemptPauseWifiTask(attempt = 1, maxAttempts = 5) {
     try {
-      if (!this.port || this.port.readable === null || this.port.writable === null) {
-        this.port = await navigator.serial.requestPort();
-        await this.port.open({ baudRate: 115200 });
-      }
-  
-      if (this.port?.writable) {
-        const writer = this.port.writable.getWriter();
-        const encoder = new TextEncoder();
-        const data = {
-          jsonrpc: '2.0',
-          id: '1',
-          method: 'scanSSIDs',
-          params: {}
-        };
-        const dataStr = JSON.stringify(data);
-        const encodedData = encoder.encode(dataStr + "\n"); // add newline character at the end
-        await writer.write(encodedData);
-        writer.releaseLock();
+      const response = await this._pauseWifiTask();
+      if (response && response.result === "WiFi task paused successfully.") {
+        console.log("WiFi task paused successfully.");
+        // WiFi task is paused, you can now proceed with other operations like scanning SSIDs
       } else {
-        console.error('The port is not writable');
+        throw new Error(`Pause WiFi task failed on attempt ${attempt}: ${response}`);
       }
-  
-      // Read the response from the device
-      const reader = this.port?.readable?.getReader();
-      let result = '';
-      while (true) {
-        const readResult = await reader?.read();
-        if (readResult?.done) break;
-        result += new TextDecoder().decode(readResult?.value);
+    } catch (error) {
+      console.error(error);
+      if (attempt < maxAttempts) {
+        setTimeout(() => this._attemptPauseWifiTask(attempt + 1, maxAttempts), 2000); // Wait 2 seconds before retrying
+      } else {
+        console.error("Maximum attempts to pause WiFi task reached.");
       }
-  
-      // Parse the JSON response
-      const response = JSON.parse(result);
-      const ssids = response.result; // Assuming the response has a 'result' field with the SSIDs
-  
-      // Update the _ssids property with the SSIDs
-      this._ssids = ssids;
-  
-      // Output the progress to a console-style window
-      this._state = "LOGS";
-      this.logger.log(`Wi-Fi scan completed.`);
-    } catch (e) {
-      this.logger.error(`There was an error scanning for SSIDs: ${(e as Error).message}`);
-    } finally {
+    }
+  }
+
+  private async _updateSsids(tries = 0) {
+    const oldSsids = this._ssids;
+    this._ssids = undefined;
+    this._busy = true;
+
+    let ssids: Ssid[];
+
+    try {
+      ssids = await this._client!.scan();
+    } catch (err) {
+      // When we fail while loading, pick "Join other"
+      if (this._ssids === undefined) {
+        this._ssids = null;
+        this._selectedSsid = null;
+      }
       this._busy = false;
-      this.requestUpdate(); // Trigger UI update to reflect not-busy state
+      return;
+    }
+
+    // We will retry a few times if we don't get any results
+    if (ssids.length === 0 && tries < 3) {
+      console.log("SCHEDULE RETRY", tries);
+      setTimeout(() => this._updateSsids(tries + 1), 1000);
+      return;
+    }
+
+    if (oldSsids) {
+      // If we had a previous list, ensure the selection is still valid
+      if (
+        this._selectedSsid &&
+        !ssids.find((s) => s.name === this._selectedSsid)
+      ) {
+        this._selectedSsid = ssids[0].name;
+      }
+    } else {
+      this._selectedSsid = ssids.length ? ssids[0].name : null;
+    }
+
+    this._ssids = ssids;
+    this._busy = false;
+  }
+
+  protected override firstUpdated(changedProps: PropertyValues) {
+    super.firstUpdated(changedProps);
+    this._initialize();
+  }
+
+  protected override updated(changedProps: PropertyValues) {
+    super.updated(changedProps);
+  
+    if (changedProps.has("_state")) {
+      this.setAttribute("state", this._state);
+  
+      if (this._state === "CONFIGURE") {
+        this._fetchCurrencies();
+        this.ensureSSIDsAreUpdated();
+      } else if (this._state === "PROVISION") {
+        if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
+          // If we pick "Join other", select SSID input.
+          this._focusFormElement("ewt-textfield[name=ssid]");
+        } else if (changedProps.has("_ssids")) {
+          // Form is shown when SSIDs are loaded/marked not supported
+          this._focusFormElement();
+        }
+      }
+    }
+  }
+
+  private _focusFormElement(selector = "ewt-textfield, ewt-select") {
+    const formEl = this.shadowRoot!.querySelector(
+      selector,
+    ) as LitElement | null;
+    if (formEl) {
+      formEl.updateComplete.then(() => setTimeout(() => formEl.focus(), 100));
     }
   }
 
@@ -1404,7 +1688,7 @@ export class EwtInstallDialog extends LitElement {
         width: 100%; /* Full width buttons */
       }
     `,
-  ];
+    ];
 }
 
 customElements.define("ewt-install-dialog", EwtInstallDialog);
