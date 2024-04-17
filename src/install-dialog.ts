@@ -240,34 +240,39 @@ export class EwtInstallDialog extends LitElement {
     } else {
       if (target.options.length <= 2 && !this.scanningSSIDs) { // Check if scan is not already in progress
         this.scanningSSIDs = true;
-        await this.populateDropdownWithSSIDs();
+        await this._populateDropdownWithSSIDs();
         this.scanningSSIDs = false;
       }
     }
   }
 
-  private async populateDropdownWithSSIDs() {
-    try {
-        const response = await this._scanSSIDs();  // Assuming this returns the JSON directly
-        if (response && response.result) {
-            const ssids = JSON.parse(response.result);
-            console.log('Parsed SSIDs:', ssids);  // Confirm parsed SSIDs
+  private async _populateDropdownWithSSIDs() {
+    if (!this.scanningSSIDs) {
+      this.scanningSSIDs = true; // Ensure we set scanningSSIDs to true to prevent concurrent scans
+      try {
+          const response = await this._scanSSIDs();  // Assuming this returns the JSON directly
+          if (response && response.result) {
+              const ssids = JSON.parse(response.result);
+              console.log('Parsed SSIDs:', ssids);  // Confirm parsed SSIDs
 
-            if (ssids.length > 0) {
-                const newSet = new Set([...this.availableSSIDs, ...ssids]);
-                this.availableSSIDs = Array.from(newSet);
-                console.log('Updated SSIDs:', this.availableSSIDs);  // Log the updated array
-                this.requestUpdate(); // Trigger update to re-render the component
-            } else {
-                console.log('No new SSIDs found');
-            }
-        } else {
-            console.log('Response did not contain SSIDs:', response);
-        }
-    } catch (error) {
-        console.error("Failed to process SSIDs:", error);
-    } finally {
-        this.scanningSSIDs = false;
+              if (ssids.length > 0) {
+                  const newSet = new Set([...this.availableSSIDs, ...ssids]);
+                  this.availableSSIDs = Array.from(newSet);
+                  console.log('Updated SSIDs:', this.availableSSIDs);  // Log the updated array
+                  this.requestUpdate(); // Trigger update to re-render the component
+              } else {
+                  console.log('No new SSIDs found');
+              }
+          } else {
+              console.log('Response did not contain SSIDs:', response);
+          }
+      } catch (error) {
+          console.error("Failed to process SSIDs:", error);
+      } finally {
+          this.scanningSSIDs = false; // Reset scanningSSIDs to false after the scan is complete
+      }
+    } else {
+      console.log("SSID scan is already in progress.");
     }
   }
 
@@ -530,20 +535,28 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions, allowClosing];
   }
 
-  private async ensureSSIDsAreUpdated() {
+  private async _ensureSSIDsAreUpdated() {
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Adding a 1 second delay before starting the process
     let attempts = 0;
-    const maxAttempts = 6; // Set a maximum number of attempts to prevent infinite loops
-    while (this.availableSSIDs.length === 0 && attempts < maxAttempts) {
-        await this.populateDropdownWithSSIDs();
-        attempts++;
-        if (this.availableSSIDs.length > 0) {
-            break; // Exit the loop if SSIDs are found
-        }
+    const maxAttempts = 12; // Set a maximum number of attempts to prevent infinite loops
+    this.scanningSSIDs = true; // Ensure scanning flag is set to true at the beginning
+    try {
+      while (this.availableSSIDs.length === 0 && attempts < maxAttempts) {
+          await this._populateDropdownWithSSIDs();
+          attempts++;
+          if (this.availableSSIDs.length > 0) {
+              break; // Exit the loop if SSIDs are found
+          }
+      }
+      if (attempts >= maxAttempts) {
+          console.log("Maximum attempts reached without finding SSIDs.");
+      }
+    } catch (error) {
+      console.error("Error updating SSIDs:", error);
+    } finally {
+      this.scanningSSIDs = false; // Ensure scanning flag is set to false at the end
     }
-    if (attempts >= maxAttempts) {
-        console.log("Maximum attempts reached without finding SSIDs.");
-    }
-}
+  }
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
@@ -850,6 +863,9 @@ private async _pauseWifiTask() {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
+    // Set scanningSSIDs to true after the form has been submitted
+    this.scanningSSIDs = true;
+
     // Create a new FormData instance
     let formData = new FormData(form);
   
@@ -857,7 +873,18 @@ private async _pauseWifiTask() {
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
 
+    // Check if manual SSID should be used
+    if (object.wifiSSID === 'manual' && object.manualSSID) {
+      object.wifiSSID = object.manualSSID;
+    }
+
+    if (object.wifiSSID2 === 'manual' && object.manualSSID2) {
+      object.wifiSSID2 = object.manualSSID2;
+    }
+
     delete object.expertMode;
+    delete object.manualSSID;
+    delete object.manualSSID2;
   
     // If expert mode is enabled, write the data to json exactly as entered by the user
     if (this._expertMode) {
@@ -947,7 +974,7 @@ private async _pauseWifiTask() {
       } else {
         console.error('The port is not writable');
       } 
-  
+      this.scanningSSIDs = false; 
       // Output the progress to a console-style window
       this._state = "LOGS";
       this.logger.log(`Configuration saved successfully.`);
@@ -1437,7 +1464,7 @@ private async _pauseWifiTask() {
   
       if (this._state === "CONFIGURE") {
         this._fetchCurrencies();
-        this.ensureSSIDsAreUpdated();
+        this._ensureSSIDsAreUpdated();
       } else if (this._state === "PROVISION") {
         if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
           // If we pick "Join other", select SSID input.
