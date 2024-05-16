@@ -65,9 +65,6 @@ export class EwtInstallDialog extends LitElement {
 
   private _info?: ImprovSerial["info"];
 
-  @state()
-  private scanningSSIDs: boolean = false; // Flag to indicate if SSID scan is in progress
-
   // null = NOT_SUPPORTED
   @state() private _client?: ImprovSerial | null;
 
@@ -105,6 +102,8 @@ export class EwtInstallDialog extends LitElement {
   // Global variable to store SSIDs
   @property({ type: Array })
   availableSSIDs: string[] = []; // Reactive property to store SSIDs
+
+  @property({ type: Boolean, reflect: true }) scanningSSIDs = false;
 
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
@@ -246,28 +245,28 @@ export class EwtInstallDialog extends LitElement {
 
   private async _populateDropdownWithSSIDs() {
     if (!this.scanningSSIDs) {
-      this.scanningSSIDs = true; // Ensure we set scanningSSIDs to true to prevent concurrent scans
+      this.scanningSSIDs = true; // Set scanningSSIDs to true before starting the scan
       try {
-          const response = await this._scanSSIDs();  // Assuming this returns the JSON directly
-          if (response && response.result) {
-              const ssids = JSON.parse(response.result);
-              console.log('Parsed SSIDs:', ssids);  // Confirm parsed SSIDs
+        const response = await this._scanSSIDs();
+        if (response && response.result) {
+          const ssids = JSON.parse(response.result);
+          console.log('Parsed SSIDs:', ssids);
 
-              if (ssids.length > 0) {
-                  const newSet = new Set([...this.availableSSIDs, ...ssids]);
-                  this.availableSSIDs = Array.from(newSet);
-                  console.log('Updated SSIDs:', this.availableSSIDs);  // Log the updated array
-                  this.requestUpdate(); // Trigger update to re-render the component
-              } else {
-                  console.log('No new SSIDs found');
-              }
+          if (ssids.length > 0) {
+            const newSet = new Set([...this.availableSSIDs, ...ssids]);
+            this.availableSSIDs = Array.from(newSet);
+            console.log('Updated SSIDs:', this.availableSSIDs);
+            this.requestUpdate();
           } else {
-              console.log('Response did not contain SSIDs:', response);
+            console.log('No new SSIDs found');
           }
+        } else {
+          console.log('Response did not contain SSIDs:', response);
+        }
       } catch (error) {
-          console.error("Failed to process SSIDs:", error);
+        console.error("Failed to process SSIDs:", error);
       } finally {
-          this.scanningSSIDs = false; // Reset scanningSSIDs to false after the scan is complete
+        this.scanningSSIDs = false; // Set scanningSSIDs to false after the scan is complete
       }
     } else {
       console.log("SSID scan is already in progress.");
@@ -535,7 +534,7 @@ export class EwtInstallDialog extends LitElement {
 
   private async _ensureSSIDsAreUpdated() {
     let attempts = 0;
-    const maxAttempts = 6; // Set a maximum number of attempts to prevent infinite loops
+    const maxAttempts = 2; // Set a maximum number of attempts to prevent infinite loops
     try {
       while (this.availableSSIDs.length === 0 && attempts < maxAttempts) {
           await this._populateDropdownWithSSIDs();
@@ -701,6 +700,8 @@ export class EwtInstallDialog extends LitElement {
       slot="primaryAction"
       label="Save Configuration"
       @click=${this._saveConfiguration}
+      ?disabled=${this.scanningSSIDs}
+      title=${this.scanningSSIDs ? 'SSID scan in progress' : ''}
     ></ewt-button>
   `;
   
@@ -865,6 +866,11 @@ private async _pauseWifiTask() {
   }
 
   private async _saveConfiguration() {
+    if (this.scanningSSIDs) {
+      alert('Cannot save configuration while SSID scan is in progress.');
+      return;
+    }
+
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
