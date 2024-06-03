@@ -1,5 +1,4 @@
 import type { FlashState } from "./const";
-import type { EwtInstallDialog } from "./install-dialog";
 import { connect } from "./connect";
 
 export class InstallButton extends HTMLElement {
@@ -72,8 +71,6 @@ export class InstallButton extends HTMLElement {
   public state?: FlashState;
 
   public renderRoot?: ShadowRoot;
-
-  public overrides: EwtInstallDialog["overrides"];
 
   public connectedCallback() {
     if (this.renderRoot) {

@@ -7,24 +7,14 @@ import "./components/ewt-dialog";
 import "./components/ewt-formfield";
 import "./components/ewt-icon-button";
 import "./components/ewt-textfield";
-import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-select";
 import "./components/ewt-list-item";
 import "./pages/ewt-page-progress";
 import "./pages/ewt-page-message";
 import {
-  chipIcon,
   closeIcon,
-  firmwareIcon,
-  refreshIcon,
 } from "./components/svg";
 import { Logger, Manifest, FlashStateType, FlashState } from "./const.js";
-import { ImprovSerial, Ssid } from "improv-wifi-serial-sdk/dist/serial";
-import {
-  ImprovSerialCurrentState,
-  ImprovSerialErrorState,
-  PortNotReady,
-} from "improv-wifi-serial-sdk/dist/const";
 import { flash } from "./flash";
 import { textDownload } from "./util/file-download";
 import { fireEvent } from "./util/fire-event";
@@ -54,19 +44,7 @@ export class EwtInstallDialog extends LitElement {
 
   private _expertMode: boolean = false;
 
-  public overrides?: {
-    checkSameFirmware?: (
-      manifest: Manifest,
-      deviceImprov: ImprovSerial["info"],
-    ) => boolean;
-  };
-
   private _manifest!: Manifest;
-
-  private _info?: ImprovSerial["info"];
-
-  // null = NOT_SUPPORTED
-  @state() private _client?: ImprovSerial | null;
 
   @state() private _state:
     | "ERROR"
@@ -81,19 +59,7 @@ export class EwtInstallDialog extends LitElement {
   @state() private _installConfirmed = false;
   @state() private _installState?: FlashState;
 
-  @state() private _provisionForce = false;
-  private _wasProvisioned = false;
-
   @state() private _error?: string;
-
-  @state() private _busy = false;
-
-  // undefined = not loaded
-  // null = not available
-  @state() private _ssids?: Ssid[] | null;
-
-  // Name of Ssid. Null = other
-  @state() private _selectedSsid: string | null = null;
 
   @state() private _currencies: string[] = [];
 
@@ -281,30 +247,14 @@ export class EwtInstallDialog extends LitElement {
     let hideActions = false;
     let allowClosing = false;
 
-    // During installation phase we temporarily remove the client
-    if (
-      this._client === undefined &&
-      this._state !== "INSTALL" &&
-      this._state !== "LOGS"
-    ) {
-      if (this._error) {
-        [heading, content, hideActions] = this._renderError(this._error);
-      } else {
-        content = this._renderProgress("Connecting");
-        hideActions = true;
-      }
-    } else if (this._state === "INSTALL") {
+    if (this._state === "INSTALL") {
       [heading, content, hideActions, allowClosing] = this._renderInstall();
     } else if (this._state === "ASK_ERASE") {
       [heading, content] = this._renderAskErase();
     } else if (this._state === "ERROR") {
       [heading, content, hideActions] = this._renderError(this._error!);
     } else if (this._state === "DASHBOARD") {
-      [heading, content, hideActions, allowClosing] = this._client
-        ? this._renderDashboard()
-        : this._renderDashboardNoImprov();
-    } else if (this._state === "PROVISION") {
-      [heading, content, hideActions] = this._renderProvision();
+      [heading, content, hideActions, allowClosing] = this._renderDashboard();
     } else if (this._state === "CONFIGURE") {
       [heading, content, hideActions] = this._renderConfigure();
     } else if (this._state === "LOGS") {
@@ -355,137 +305,6 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
-    const heading = this._info!.name;
-    let content: TemplateResult;
-    let hideActions = true;
-    let allowClosing = true;
-
-    content = html`
-      <div class="table-row">
-        ${firmwareIcon}
-        <div>${this._info!.firmware}&nbsp;${this._info!.version}</div>
-      </div>
-      <div class="table-row last">
-        ${chipIcon}
-        <div>${this._info!.chipFamily}</div>
-      </div>
-      <div class="dashboard-buttons">
-        ${!this._isSameVersion
-          ? html`
-              <div>
-                <ewt-button
-                  text-left
-                  .label=${!this._isSameFirmware
-                    ? `Install ${this._manifest.name}`
-                    : `Update ${this._manifest.name}`}
-                  @click=${() => {
-                    if (this._isSameFirmware) {
-                      this._startInstall(false);
-                    } else if (this._manifest.new_install_prompt_erase) {
-                      this._state = "ASK_ERASE";
-                    } else {
-                      this._startInstall(true);
-                    }
-                  }}
-                ></ewt-button>
-              </div>
-            `
-          : ""}
-        <div>
-          <ewt-button
-          label="Configure"
-          @click=${async () => {
-            this._state = "CONFIGURE";
-          }}
-          ></ewt-button>
-        </div>
-        ${this._client!.nextUrl === undefined
-          ? ""
-          : html`
-              <div>
-                <a
-                  href=${this._client!.nextUrl}
-                  class="has-button"
-                  target="_blank"
-                >
-                  <ewt-button label="Visit Device"></ewt-button>
-                </a>
-              </div>
-            `}
-        ${!this._manifest.home_assistant_domain ||
-        this._client!.state !== ImprovSerialCurrentState.PROVISIONED
-          ? ""
-          : html`
-              <div>
-                <a
-                  href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
-                  class="has-button"
-                  target="_blank"
-                >
-                  <ewt-button label="Add to Home Assistant"></ewt-button>
-                </a>
-              </div>
-            `}
-        <div>
-          <ewt-button
-            .label=${this._client!.state === ImprovSerialCurrentState.READY
-              ? "Connect to Wi-Fi"
-              : "Change Wi-Fi"}
-            @click=${() => {
-              this._state = "PROVISION";
-              if (
-                this._client!.state === ImprovSerialCurrentState.PROVISIONED
-              ) {
-                this._provisionForce = true;
-              }
-            }}
-          ></ewt-button>
-        </div>
-        <div>
-          <ewt-button
-            label="Logs & Console"
-            @click=${async () => {
-              const client = this._client;
-              if (client) {
-                await this._closeClientWithoutEvents(client);
-                await sleep(100);
-              }
-              // Also set `null` back to undefined.
-              this._client = undefined;
-              this._state = "LOGS";
-            }}
-          ></ewt-button>
-        </div>
-        ${this._isSameFirmware && this._manifest.funding_url
-          ? html`
-              <div>
-                <a
-                  class="button"
-                  href=${this._manifest.funding_url}
-                  target="_blank"
-                >
-                  <ewt-button label="Fund Development"></ewt-button>
-                </a>
-              </div>
-            `
-          : ""}
-        ${this._isSameVersion
-          ? html`
-              <div>
-                <ewt-button
-                  class="danger"
-                  label="Erase User Data"
-                  @click=${() => this._startInstall(true)}
-                ></ewt-button>
-              </div>
-            `
-          : ""}
-      </div>
-    `;
-
-    return [heading, content, hideActions, allowClosing];
-  }
-  _renderDashboardNoImprov(): [string, TemplateResult, boolean, boolean] {
     const heading = "Device Dashboard";
     let content: TemplateResult;
     let hideActions = true;
@@ -501,7 +320,6 @@ export class EwtInstallDialog extends LitElement {
               if (this._manifest.new_install_prompt_erase) {
                 this._state = "ASK_ERASE";
               } else {
-                // Default is to erase a device that does not support Improv Serial
                 this._startInstall(true);
               }
             }}
@@ -519,8 +337,6 @@ export class EwtInstallDialog extends LitElement {
           <ewt-button
             label="Logs & Console"
             @click=${async () => {
-              // Also set `null` back to undefined.
-              this._client = undefined;
               this._state = "LOGS";
             }}
           ></ewt-button>
@@ -926,192 +742,6 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  _renderProvision(): [string | undefined, TemplateResult, boolean] {
-    let heading: string | undefined = "Configure Wi-Fi";
-    let content: TemplateResult;
-    let hideActions = false;
-
-    if (this._busy) {
-      return [
-        heading,
-        this._renderProgress(
-          this._ssids === undefined
-            ? "Scanning for networks"
-            : "Trying to connect",
-        ),
-        true,
-      ];
-    }
-
-    if (
-      !this._provisionForce &&
-      this._client!.state === ImprovSerialCurrentState.PROVISIONED
-    ) {
-      heading = undefined;
-      const showSetupLinks =
-        !this._wasProvisioned &&
-        (this._client!.nextUrl !== undefined ||
-          "home_assistant_domain" in this._manifest);
-      hideActions = showSetupLinks;
-      content = html`
-        <ewt-page-message
-          .icon=${OK_ICON}
-          label="Device connected to the network!"
-        ></ewt-page-message>
-        ${showSetupLinks
-          ? html`
-              <div class="dashboard-buttons">
-                ${this._client!.nextUrl === undefined
-                  ? ""
-                  : html`
-                      <div>
-                        <a
-                          href=${this._client!.nextUrl}
-                          class="has-button"
-                          target="_blank"
-                          @click=${() => {
-                            this._state = "DASHBOARD";
-                          }}
-                        >
-                          <ewt-button label="Visit Device"></ewt-button>
-                        </a>
-                      </div>
-                    `}
-                ${!this._manifest.home_assistant_domain
-                  ? ""
-                  : html`
-                      <div>
-                        <a
-                          href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
-                          class="has-button"
-                          target="_blank"
-                          @click=${() => {
-                            this._state = "DASHBOARD";
-                          }}
-                        >
-                          <ewt-button
-                            label="Add to Home Assistant"
-                          ></ewt-button>
-                        </a>
-                      </div>
-                    `}
-                <div>
-                  <ewt-button
-                    label="Skip"
-                    @click=${() => {
-                      this._state = "DASHBOARD";
-                    }}
-                  ></ewt-button>
-                </div>
-              </div>
-            `
-          : html`
-              <ewt-button
-                slot="primaryAction"
-                label="Continue"
-                @click=${() => {
-                  this._state = "DASHBOARD";
-                }}
-              ></ewt-button>
-            `}
-      `;
-    } else {
-      let error: string | undefined;
-
-      switch (this._client!.error) {
-        case ImprovSerialErrorState.UNABLE_TO_CONNECT:
-          error = "Unable to connect";
-          break;
-
-        case ImprovSerialErrorState.TIMEOUT:
-          error = "Timeout";
-          break;
-
-        case ImprovSerialErrorState.NO_ERROR:
-        // Happens when list SSIDs not supported.
-        case ImprovSerialErrorState.UNKNOWN_RPC_COMMAND:
-          break;
-
-        default:
-          error = `Unknown error (${this._client!.error})`;
-      }
-      const selectedSsid = this._ssids?.find(
-        (info) => info.name === this._selectedSsid,
-      );
-      content = html`
-        <div>
-          Enter the credentials of the Wi-Fi network that you want your device
-          to connect to.
-        </div>
-        ${error ? html`<p class="error">${error}</p>` : ""}
-        ${this._ssids !== null
-          ? html`
-              <ewt-select
-                fixedMenuPosition
-                label="Network"
-                @selected=${(ev: { detail: { index: number } }) => {
-                  const index = ev.detail.index;
-                  // The "Join Other" item is always the last item.
-                  this._selectedSsid =
-                    index === this._ssids!.length
-                      ? null
-                      : this._ssids![index].name;
-                }}
-                @closed=${(ev: Event) => ev.stopPropagation()}
-              >
-                ${this._ssids!.map(
-                  (info) => html`
-                    <ewt-list-item
-                      .selected=${selectedSsid === info}
-                      .value=${info.name}
-                    >
-                      ${info.name}
-                    </ewt-list-item>
-                  `,
-                )}
-                <ewt-list-item .selected=${!selectedSsid} value="-1">
-                  Join other…
-                </ewt-list-item>
-              </ewt-select>
-              <ewt-icon-button @click=${this._updateSsids}>
-                ${refreshIcon}
-              </ewt-icon-button>
-            `
-          : ""}
-        ${
-          // Show input box if command not supported or "Join Other" selected
-          !selectedSsid
-            ? html`
-                <ewt-textfield label="Network Name" name="ssid"></ewt-textfield>
-              `
-            : ""
-        }
-        ${!selectedSsid || selectedSsid.secured
-          ? html`
-              <ewt-textfield
-                label="Password"
-                name="password"
-                type="password"
-              ></ewt-textfield>
-            `
-          : ""}
-        <ewt-button
-          slot="primaryAction"
-          label="Connect"
-          @click=${this._doProvision}
-        ></ewt-button>
-        <ewt-button
-          slot="secondaryAction"
-          .label=${this._installState && this._installErase ? "Skip" : "Back"}
-          @click=${() => {
-            this._state = "DASHBOARD";
-          }}
-        ></ewt-button>
-      `;
-    }
-    return [heading, content, hideActions];
-  }
-
   _renderAskErase(): [string | undefined, TemplateResult] {
     const heading = "Erase device";
     const content = html`
@@ -1147,31 +777,11 @@ export class EwtInstallDialog extends LitElement {
     let content: TemplateResult;
     let hideActions = false;
     const allowClosing = false;
-
-    const isUpdate = !this._installErase && this._isSameFirmware;
-
-    if (!this._installConfirmed && this._isSameVersion) {
-      heading = "Erase User Data";
-      content = html`
-        Do you want to reset your device and erase all user data from your
-        device?
-        <ewt-button
-          class="danger"
-          slot="primaryAction"
-          label="Erase User Data"
-          @click=${this._confirmInstall}
-        ></ewt-button>
-      `;
-    } else if (!this._installConfirmed) {
+  
+    if (!this._installConfirmed) {
       heading = "Confirm Installation";
-      const action = isUpdate ? "update to" : "install";
       content = html`
-        ${isUpdate
-          ? html`Your device is running
-              ${this._info!.firmware}&nbsp;${this._info!.version}.<br /><br />`
-          : ""}
-        Do you want to ${action}
-        ${this._manifest.name}&nbsp;${this._manifest.version}?
+        Do you want to install ${this._manifest.name}&nbsp;${this._manifest.version}?
         ${this._installErase
           ? html`<br /><br />All data on the device will be erased.`
           : ""}
@@ -1200,42 +810,28 @@ export class EwtInstallDialog extends LitElement {
       heading = "Installing";
       content = this._renderProgress("Erasing");
       hideActions = true;
-    } else if (
-      this._installState.state === FlashStateType.WRITING ||
-      // When we're finished, keep showing this screen with 100% written
-      // until Improv is initialized / not detected.
-      (this._installState.state === FlashStateType.FINISHED &&
-        this._client === undefined)
-    ) {
+    } else if (this._installState.state === FlashStateType.WRITING) {
       heading = "Installing";
       let percentage: number | undefined;
-      let undeterminateLabel: string | undefined;
-      if (this._installState.state === FlashStateType.FINISHED) {
-        // We're done writing and detecting improv, show spinner
-        undeterminateLabel = "Wrapping up";
-      } else if (this._installState.details.percentage < 4) {
-        // We're writing the firmware under 4%, show spinner or else we don't show any pixels
-        undeterminateLabel = "Installing";
+      if (this._installState.details.percentage < 4) {
+        content = this._renderProgress("Installing");
       } else {
-        // We're writing the firmware over 4%, show progress bar
         percentage = this._installState.details.percentage;
+        content = this._renderProgress(
+          html`
+            Installing<br />
+            This will take
+            ${this._installState.chipFamily === "ESP8266"
+              ? "a minute"
+              : "2 minutes"}.<br />
+            Keep this page visible to prevent slow down
+          `,
+          percentage,
+        );
       }
-      content = this._renderProgress(
-        html`
-          ${undeterminateLabel ? html`${undeterminateLabel}<br />` : ""}
-          <br />
-          This will take
-          ${this._installState.chipFamily === "ESP8266"
-            ? "a minute"
-            : "2 minutes"}.<br />
-          Keep this page visible to prevent slow down
-        `,
-        percentage,
-      );
       hideActions = true;
     } else if (this._installState.state === FlashStateType.FINISHED) {
       heading = undefined;
-      const supportsImprov = this._client !== null;
       content = html`
         <ewt-page-message
           .icon=${OK_ICON}
@@ -1245,8 +841,7 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Next"
           @click=${() => {
-            this._state =
-              supportsImprov && this._installErase ? "PROVISION" : "DASHBOARD";
+            this._state = "DASHBOARD";
           }}
         ></ewt-button>
       `;
@@ -1319,60 +914,11 @@ export class EwtInstallDialog extends LitElement {
     if (this._state !== "ERROR") {
       this._error = undefined;
     }
-    // Scan for SSIDs on provision
-    if (this._state === "PROVISION") {
-      this._updateSsids();
-    } else {
-      // Reset this value if we leave provisioning.
-      this._provisionForce = false;
-    }
 
     if (this._state === "INSTALL") {
       this._installConfirmed = false;
       this._installState = undefined;
     }
-  }
-
-  private async _updateSsids(tries = 0) {
-    const oldSsids = this._ssids;
-    this._ssids = undefined;
-    this._busy = true;
-
-    let ssids: Ssid[];
-
-    try {
-      ssids = await this._client!.scan();
-    } catch (err) {
-      // When we fail while loading, pick "Join other"
-      if (this._ssids === undefined) {
-        this._ssids = null;
-        this._selectedSsid = null;
-      }
-      this._busy = false;
-      return;
-    }
-
-    // We will retry a few times if we don't get any results
-    if (ssids.length === 0 && tries < 3) {
-      console.log("SCHEDULE RETRY", tries);
-      setTimeout(() => this._updateSsids(tries + 1), 1000);
-      return;
-    }
-
-    if (oldSsids) {
-      // If we had a previous list, ensure the selection is still valid
-      if (
-        this._selectedSsid &&
-        !ssids.find((s) => s.name === this._selectedSsid)
-      ) {
-        this._selectedSsid = ssids[0].name;
-      }
-    } else {
-      this._selectedSsid = ssids.length ? ssids[0].name : null;
-    }
-
-    this._ssids = ssids;
-    this._busy = false;
   }
 
   protected override firstUpdated(changedProps: PropertyValues) {
@@ -1389,24 +935,7 @@ export class EwtInstallDialog extends LitElement {
       if (this._state === "CONFIGURE") {
         this._fetchCurrencies();
         this._ensureSSIDsAreUpdated();
-      } else if (this._state === "PROVISION") {
-        if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
-          // If we pick "Join other", select SSID input.
-          this._focusFormElement("ewt-textfield[name=ssid]");
-        } else if (changedProps.has("_ssids")) {
-          // Form is shown when SSIDs are loaded/marked not supported
-          this._focusFormElement();
-        }
-      }
-    }
-  }
-
-  private _focusFormElement(selector = "ewt-textfield, ewt-select") {
-    const formEl = this.shadowRoot!.querySelector(
-      selector,
-    ) as LitElement | null;
-    if (formEl) {
-      formEl.updateComplete.then(() => setTimeout(() => formEl.focus(), 100));
+        } 
     }
   }
 
@@ -1425,40 +954,6 @@ export class EwtInstallDialog extends LitElement {
       this._error = "Failed to download manifest";
       return;
     }
-
-    if (this._manifest.new_install_improv_wait_time === 0) {
-      this._client = null;
-      return;
-    }
-
-    const client = new ImprovSerial(this.port!, this.logger);
-    client.addEventListener("state-changed", () => {
-      this.requestUpdate();
-    });
-    client.addEventListener("error-changed", () => this.requestUpdate());
-    try {
-      // If a device was just installed, give new firmware 10 seconds (overridable) to
-      // format the rest of the flash and do other stuff.
-      const timeout = !justInstalled
-        ? 1000
-        : this._manifest.new_install_improv_wait_time !== undefined
-          ? this._manifest.new_install_improv_wait_time * 1000
-          : 10000;
-      this._info = await client.initialize(timeout);
-      this._client = client;
-      client.addEventListener("disconnect", this._handleDisconnect);
-    } catch (err: any) {
-      // Clear old value
-      this._info = undefined;
-      if (err instanceof PortNotReady) {
-        this._state = "ERROR";
-        this._error =
-          "Serial port is not ready. Close any other application using it and try again.";
-      } else {
-        this._client = null; // not supported
-        this.logger.error("Improv initialization failed.", err);
-      }
-    }
   }
 
   private _startInstall(erase: boolean) {
@@ -1470,10 +965,6 @@ export class EwtInstallDialog extends LitElement {
   private _confirmInstall() {
     this._installConfirmed = true;
     this._installState = undefined;
-    if (this._client) {
-      this._closeClientWithoutEvents(this._client);
-    }
-    this._client = undefined;
   
     // Close port. ESPLoader likes opening it.
     this.port.close().then(() => {
@@ -1505,70 +996,9 @@ export class EwtInstallDialog extends LitElement {
     // YOLO2
   }
 
-  private async _doProvision() {
-    this._busy = true;
-    this._wasProvisioned =
-      this._client!.state === ImprovSerialCurrentState.PROVISIONED;
-    const ssid =
-      this._selectedSsid === null
-        ? (
-            this.shadowRoot!.querySelector(
-              "ewt-textfield[name=ssid]",
-            ) as EwtTextfield
-          ).value
-        : this._selectedSsid;
-    const password =
-      (
-        this.shadowRoot!.querySelector(
-          "ewt-textfield[name=password]",
-        ) as EwtTextfield | null
-      )?.value || "";
-    try {
-      await this._client!.provision(ssid, password, 30000);
-    } catch (err: any) {
-      return;
-    } finally {
-      this._busy = false;
-      this._provisionForce = false;
-    }
-  }
-
-  private _handleDisconnect = () => {
-    this._state = "ERROR";
-    this._error = "Disconnected";
-  };
-
   private async _handleClose() {
-    if (this._client) {
-      await this._closeClientWithoutEvents(this._client);
-    }
     fireEvent(this, "closed" as any);
     this.parentNode!.removeChild(this);
-  }
-
-  /**
-   * Return if the device runs same firmware as manifest.
-   */
-  private get _isSameFirmware() {
-    return !this._info
-      ? false
-      : this.overrides?.checkSameFirmware
-        ? this.overrides.checkSameFirmware(this._manifest, this._info)
-        : this._info.firmware === this._manifest.name;
-  }
-
-  /**
-   * Return if the device runs same firmware and version as manifest.
-   */
-  private get _isSameVersion() {
-    return (
-      this._isSameFirmware && this._info!.version === this._manifest.version
-    );
-  }
-
-  private async _closeClientWithoutEvents(client: ImprovSerial) {
-    client.removeEventListener("disconnect", this._handleDisconnect);
-    await client.close();
   }
 
   static styles = [
