@@ -249,12 +249,11 @@ export class EwtInstallDialog extends LitElement {
       try {
         const response = await this._scanSSIDs();
         if (response && response.result) {
-          const ssids = JSON.parse(response.result);
+          const ssids = response.result; // Directly use the result array
           console.log('Parsed SSIDs:', ssids);
 
           if (ssids.length > 0) {
-            const newSet = new Set([...this.availableSSIDs, ...ssids]);
-            this.availableSSIDs = Array.from(newSet);
+            this.availableSSIDs = Array.from(new Set([...this.availableSSIDs, ...ssids]));
             console.log('Updated SSIDs:', this.availableSSIDs);
             this.requestUpdate();
           } else {
@@ -660,40 +659,39 @@ export class EwtInstallDialog extends LitElement {
         </div>
       `}
       <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
-      <div style="grid-column: 1;">
-        <label>WiFi SSID:</label>
-      </div>
-      <div style="grid-column: 3;">
-        <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
-          <option value="">--select SSID--</option>
-          ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-          <option value="manual">Enter Manually</option>
-        </select>
-        <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
-      </div>
+    <div style="grid-column: 1;">
+      <label>WiFi SSID:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
+        <option value="">--select SSID--</option>
+        ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+        <option value="manual">Enter Manually</option>
+      </select>
+      <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
+    </div>
     <div style="grid-column: 1;">
       <label>WiFi Password:</label>
     </div>
     <div style="grid-column: 3;">
       <input type="text" name="wifiPwd" value="" />
     </div>
-    <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
-      <div style="grid-column: 1;">
-        <label>WiFi SSID2:</label>
-      </div>
-      <div style="grid-column: 3;">
-        <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
-          <option value="">--select SSID--</option>
-          ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-          <option value="manual">Enter Manually</option>
-        </select>
-        <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
-      </div>
+    <div style="grid-column: 1;">
+      <label>WiFi SSID2:</label>
+    </div>
+    <div style="grid-column: 3;">
+      <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
+        <option value="">--select SSID--</option>
+        ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+        <option value="manual">Enter Manually</option>
+      </select>
+      <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
+    </div>
     <div style="grid-column: 1;">
       <label>WiFi Password 2:</label>
     </div>
     <div style="grid-column: 3;">
-      <input type="text" name="wifiPwd2" value="" />
+        <input type="text" name="wifiPwd2" value="" />
     </div>
     </form>
     <ewt-button
@@ -792,72 +790,6 @@ export class EwtInstallDialog extends LitElement {
     }
     return jsonResponses;
   }
-
-private async _pauseWifiTask() {
-  const id = "1";
-  const jsonRpcVersion = "2.0";
-
-  const data = {
-    "jsonrpc": jsonRpcVersion,
-    "id": id,
-    "method": "pauseWifiTask",
-    "params": {}
-  };
-
-  // Write the data to the serial port
-  if (this.port && this.port.writable) {
-    const writer = this.port.writable.getWriter();
-    const encoder = new TextEncoder();
-    const dataStr = JSON.stringify(data) + "\n";
-    const encodedData = encoder.encode(dataStr);
-    await writer.write(encodedData);
-    writer.releaseLock();
-  } else {
-    throw new Error("Serial port is not open or writable");
-  }
-
-  // Read the response from the serial port
-  if (this.port && this.port.readable) {
-    const reader = this.port.readable.getReader();
-    try {
-      let completeData = '';
-      let jsonStarted = false;
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          break;
-        }
-        const textDecoder = new TextDecoder();
-        const chunk = textDecoder.decode(value, { stream: true });
-        completeData += chunk;
-
-        if (chunk.includes('{')) {
-          jsonStarted = true;
-          completeData = completeData.substring(completeData.indexOf('{'));
-        }
-
-        if (jsonStarted && chunk.includes('}')) {
-          completeData = completeData.substring(0, completeData.lastIndexOf('}') + 1);
-          break;
-        }
-      }
-      reader.releaseLock();
-
-      if (jsonStarted) {
-        const response = JSON.parse(completeData);
-        console.log("Pause WiFi task response:", response);
-        return response;
-      } else {
-        throw new Error("No JSON data received from the serial port");
-      }
-    } catch (error) {
-      console.error('Error reading from serial port:', error);
-      throw error;
-    }
-  } else {
-    throw new Error("Serial port is not open or readable");
-  }
-}
 
   private _toggleExpertMode(event: Event) {
     const checkbox = event.target as HTMLInputElement;
@@ -1398,25 +1330,6 @@ private async _pauseWifiTask() {
     if (this._state === "INSTALL") {
       this._installConfirmed = false;
       this._installState = undefined;
-    }
-  }
-
-  private async _attemptPauseWifiTask(attempt = 1, maxAttempts = 5) {
-    try {
-      const response = await this._pauseWifiTask();
-      if (response && response.result === "WiFi task paused successfully.") {
-        console.log("WiFi task paused successfully.");
-        // WiFi task is paused, you can now proceed with other operations like scanning SSIDs
-      } else {
-        throw new Error(`Pause WiFi task failed on attempt ${attempt}: ${response}`);
-      }
-    } catch (error) {
-      console.error(error);
-      if (attempt < maxAttempts) {
-        setTimeout(() => this._attemptPauseWifiTask(attempt + 1, maxAttempts), 2000); // Wait 2 seconds before retrying
-      } else {
-        console.error("Maximum attempts to pause WiFi task reached.");
-      }
     }
   }
 
