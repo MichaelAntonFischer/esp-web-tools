@@ -704,12 +704,11 @@ export class EwtInstallDialog extends LitElement {
       label="Save Configuration"
       @click=${() => {
         if (this.scanningSSIDs) {
-          alert('SSID scan in progress');
+          alert('SSID scan in progress. Please wait a moment before saving the configurations.');
         } else {
           this._saveConfiguration();
         }
       }}
-      .title=${this.scanningSSIDs ? 'SSID scan in progress. Please wait a moment before saving the configurations.' : ''}
     ></ewt-button>
   `;
   
