@@ -345,7 +345,7 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private _renderVerifyConfig(): [string | undefined, TemplateResult, boolean] {
-    const heading = "Verifying Configuration";
+    const heading = "";
     const content = this._renderProgress("Verifying configuration...");
     const hideActions = true;
 
@@ -432,7 +432,15 @@ export class EwtInstallDialog extends LitElement {
     if (this.port.readable) {
       const reader = this.port.readable.getReader();
       const decoder = new TextDecoderStream();
-      this.port.readable.pipeTo(decoder.writable);
+      
+      // Check if the stream is locked before piping
+      if (!this.port.readable.locked) {
+        this.port.readable.pipeTo(decoder.writable);
+      } else {
+        console.error('The readable stream is already locked');
+        return output;
+      }
+
       const inputStream = decoder.readable.getReader();
 
       try {
