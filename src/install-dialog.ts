@@ -444,27 +444,19 @@ export class EwtInstallDialog extends LitElement {
 
   private async _readESP32Output(): Promise<string> {
     let output = "";
-    let reader: ReadableStreamDefaultReader<Uint8Array>;
-    let inputStream: ReadableStreamDefaultReader<string>;
+    const decoder = new TextDecoder();
 
     if (this.port.readable) {
-      if (!this.port.readable.locked) {
-        reader = this.port.readable.getReader();
-        const decoder = new TextDecoderStream();
-        this.port.readable.pipeTo(decoder.writable);
-        inputStream = decoder.readable.getReader();
-      } else {
-        console.error('The readable stream is already locked');
-        return output;
-      }
-
+      const reader = this.port.readable.getReader();
       try {
         while (true) {
-          const { value, done } = await inputStream.read();
+          const { value, done } = await reader.read();
           if (done) {
             break;
           }
-          output += value;
+          const chunk = decoder.decode(value, { stream: true });
+          console.log(chunk);  // Output each chunk read to the console
+          output += chunk;
         }
       } catch (error) {
         console.error('Error reading from the port:', error);
