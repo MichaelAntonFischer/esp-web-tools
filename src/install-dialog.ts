@@ -565,7 +565,7 @@ export class EwtInstallDialog extends LitElement {
   
     // Use this._currencies instead of fetching the currencies
     let currencies: string[] = this._currencies;
-
+  
     // Initialize the "Existing Devices" selector to the "Select a configuration" state
     let configSelector = this.shadowRoot!.querySelector('select[name="existingConfigs"]') as HTMLSelectElement;
     if (configSelector) {
@@ -578,131 +578,130 @@ export class EwtInstallDialog extends LitElement {
     } 
   
     content = html`
-    <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
+      <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr; gap: 8px;">
+        <div style="grid-column: 1;">
+          <label>Expert Mode:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="checkbox" id="expertMode" name="expertMode" .checked=${this._expertMode} @change=${this._toggleExpertMode} />
+        </div>
+        ${this._expertMode ? html`
+          <div style="grid-column: 1;">
+            <label>API Key:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Callback URL:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="callbackUrl" value="https://${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Fiat Precision:</label>
+          </div>
+          <div style="grid-column: 1;">
+            <label>Battery Max Volts:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="batteryMaxVolts" value="4.2" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Battery Min Volts:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="batteryMinVolts" value="3.3" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Contrast Level:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="contrastLevel" value="75" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Log Level:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="logLevel" value="info" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Fiat Currency:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <select id="fiatCurrency" name="fiatCurrency">
+              ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+            </select>
+          </div>
+        ` : html`
+          <div style="grid-column: 1;">
+            <label>Select Device:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <select name="existingConfigs" @change=${this._handleConfigChange}>
+              ${this._existingConfigs.map(config => html`
+                <option value="${config.id}">${config.title}</option>
+              `)}
+              <option value="createNewDevice" selected>Create New Device</option>
+            </select>
+          </div>
+          <div style="grid-column: 1;" id="titleLabel" style="display: none;">
+            <label>Title:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="title" id="titleInput" style="display: none;" />
+          </div>
+          <div style="grid-column: 1;">
+            <label>Fiat Precision:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <input type="text" name="fiatPrecision" value="2" />
+          </div>
+          <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
+            <label>Fiat Currency:</label>
+          </div>
+          <div style="grid-column: 3;">
+            <select id="fiatCurrency" name="fiatCurrency" style="display: none;">
+              ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
+            </select>
+          </div>
+        `}
+        <div style="grid-column: 1;">
+          <label>WiFi SSID:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
+            <option value="">--select SSID--</option>
+            ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+            <option value="manual">Enter Manually</option>
+          </select>
+          <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
+        </div>
+        <div style="grid-column: 1;">
+          <label>WiFi Password:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="wifiPwd" value="" />
+        </div>
+        <div style="grid-column: 1;">
+          <label>WiFi SSID2:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
+          <option value="">--select SSID--</option>
+          ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
+          <option value="manual">Enter Manually</option>
+        </select>
+        <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
+      </div>
       <div style="grid-column: 1;">
-        <label>Expert Mode:</label>
+        <label>WiFi Password 2:</label>
       </div>
       <div style="grid-column: 3;">
-        <input type="checkbox" id="expertMode" name="expertMode" .checked=${this._expertMode} @change=${this._toggleExpertMode} />
-      </div>
-      ${this._expertMode ? html`
-        <div style="grid-column: 1;">
-          <label>API Key:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Callback URL:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="callbackUrl" value="https://${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Fiat Precision:</label>
-        </div>
-        <div style="grid-column: 1;">
-          <label>Battery Max Volts:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="batteryMaxVolts" value="4.2" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Battery Min Volts:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="batteryMinVolts" value="3.3" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Contrast Level:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="contrastLevel" value="75" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Log Level:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="logLevel" value="info" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Fiat Currency:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <select id="fiatCurrency" name="fiatCurrency">
-            ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
-          </select>
-        </div>
-      ` : html`
-        <div style="grid-column: 1;">
-          <label>Select Device:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <select name="existingConfigs" @change=${this._handleConfigChange}>
-            ${this._existingConfigs.map(config => html`
-              <option value="${config.id}">${config.title}</option>
-            `)}
-            <option value="createNewDevice" selected>Create New Device</option>
-          </select>
-        </div>
-        <div style="grid-column: 1;" id="titleLabel" style="display: none;">
-          <label>Title:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="title" id="titleInput" style="display: none;" />
-        </div>
-        <div style="grid-column: 1;">
-          <label>Fiat Precision:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="fiatPrecision" value="2" />
-        </div>
-        <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
-          <label>Fiat Currency:</label>
-        </div>
-        <div style="grid-column: 3;">
-          <select id="fiatCurrency" name="fiatCurrency" style="display: none;">
-            ${currencies.map(currency => html`<option value="${currency}" ${currency === 'EUR' ? 'selected' : ''}>${currency}</option>`)}
-          </select>
-        </div>
-      `}
-      <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
-    <div style="grid-column: 1;">
-      <label>WiFi SSID:</label>
-    </div>
-    <div style="grid-column: 3;">
-      <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
-        <option value="">--select SSID--</option>
-        ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-        <option value="manual">Enter Manually</option>
-      </select>
-      <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
-    </div>
-    <div style="grid-column: 1;">
-      <label>WiFi Password:</label>
-    </div>
-    <div style="grid-column: 3;">
-      <input type="text" name="wifiPwd" value="" />
-    </div>
-    <div style="grid-column: 1;">
-      <label>WiFi SSID2:</label>
-    </div>
-    <div style="grid-column: 3;">
-      <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
-        <option value="">--select SSID--</option>
-        ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-        <option value="manual">Enter Manually</option>
-      </select>
-      <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
-    </div>
-    <div style="grid-column: 1;">
-      <label>WiFi Password 2:</label>
-    </div>
-    <div style="grid-column: 3;">
         <input type="text" name="wifiPwd2" value="" />
-    </div>
+      </div>
     </form>
-    <div style="display: flex; justify-content: space-between; margin-top: 16px;">
+    <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
       <ewt-button
         slot="secondaryAction"
         label="Back"
@@ -715,7 +714,7 @@ export class EwtInstallDialog extends LitElement {
       ></ewt-button>
       <ewt-button
         slot="primaryAction"
-        label="Save Configuration"
+        label="Save"
         @click=${() => {
           if (this.scanningSSIDs) {
             alert('SSID scan in progress. Please wait a moment before saving the configurations.');
@@ -726,9 +725,9 @@ export class EwtInstallDialog extends LitElement {
       ></ewt-button>
     </div>
   `;
-  
-    return [heading, content, hideActions];
-  }
+
+  return [heading, content, hideActions];
+}
 
   private async _scanSSIDs(): Promise<any> {
     const id = "1";
