@@ -601,9 +601,6 @@ export class EwtInstallDialog extends LitElement {
         <div style="grid-column: 1;">
           <label>Fiat Precision:</label>
         </div>
-        <div style="grid-column: 3;">
-          <input type="text" name="fiatPrecision" value="2" />
-        </div>
         <div style="grid-column: 1;">
           <label>Battery Max Volts:</label>
         </div>
@@ -654,6 +651,12 @@ export class EwtInstallDialog extends LitElement {
         <div style="grid-column: 3;">
           <input type="text" name="title" id="titleInput" style="display: none;" />
         </div>
+        <div style="grid-column: 1;">
+          <label>Fiat Precision:</label>
+        </div>
+        <div style="grid-column: 3;">
+          <input type="text" name="fiatPrecision" value="2" />
+        </div>
         <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
           <label>Fiat Currency:</label>
         </div>
@@ -699,17 +702,29 @@ export class EwtInstallDialog extends LitElement {
         <input type="text" name="wifiPwd2" value="" />
     </div>
     </form>
-    <ewt-button
-      slot="primaryAction"
-      label="Save Configuration"
-      @click=${() => {
-        if (this.scanningSSIDs) {
-          alert('SSID scan in progress. Please wait a moment before saving the configurations.');
-        } else {
-          this._saveConfiguration();
-        }
-      }}
-    ></ewt-button>
+    <div style="display: flex; justify-content: space-between; margin-top: 16px;">
+      <ewt-button
+        slot="secondaryAction"
+        label="Back"
+        @click=${() => {
+          if (confirm('Are you sure you want to go back? This can leave your device in an undesirable state.')) {
+            this._state = "DASHBOARD";
+            this.requestUpdate();
+          }
+        }}
+      ></ewt-button>
+      <ewt-button
+        slot="primaryAction"
+        label="Save Configuration"
+        @click=${() => {
+          if (this.scanningSSIDs) {
+            alert('SSID scan in progress. Please wait a moment before saving the configurations.');
+          } else {
+            this._saveConfiguration();
+          }
+        }}
+      ></ewt-button>
+    </div>
   `;
   
     return [heading, content, hideActions];
@@ -1074,7 +1089,7 @@ export class EwtInstallDialog extends LitElement {
                   `,
                 )}
                 <ewt-list-item .selected=${!selectedSsid} value="-1">
-                  Join other…
+                  Join other
                 </ewt-list-item>
               </ewt-select>
               <ewt-icon-button @click=${this._updateSsids}>
