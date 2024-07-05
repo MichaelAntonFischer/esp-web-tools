@@ -77,19 +77,24 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _fetchConfigs() {
-    const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-  
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    try {
+      const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Store the entire configuration objects, not just the ids
+      this._existingConfigs = await response.json();
+    } catch (error) {
+      console.error('Error fetching configurations:', error);
+      alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
     }
-  
-    // Store the entire configuration objects, not just the ids
-    this._existingConfigs = await response.json();
   }
 
   private _handleConfigChange(event: Event) {
@@ -513,9 +518,13 @@ export class EwtInstallDialog extends LitElement {
     <ewt-button
       slot="primaryAction"
       label="Save Configuration"
-      @click=${this._saveConfiguration}
-      ?disabled=${this.scanningSSIDs}
-      title=${this.scanningSSIDs ? 'SSID scan in progress' : ''}
+      @click=${() => {
+        if (this.scanningSSIDs) {
+          alert('SSID scan in progress. Please wait a moment before saving the configurations.');
+        } else {
+          this._saveConfiguration();
+        }
+      }}
     ></ewt-button>
   `;
   
@@ -614,11 +623,6 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _saveConfiguration() {
-    if (this.scanningSSIDs) {
-      alert('Cannot save configuration while SSID scan is in progress.');
-      return;
-    }
-
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
@@ -704,8 +708,8 @@ export class EwtInstallDialog extends LitElement {
       "params": object
     };
     // Check if the API key or callback url are blank
-    if (!data.params['apiKey.key'] || !data.params['callbackUrl']) {
-      alert('Creating Config Failed: API key or callback url are blank. Please reload the page and try again. If the problem reappears, contact support@opago-pay.com');
+    if (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz') {
+      alert('Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
       return;
     }
     
