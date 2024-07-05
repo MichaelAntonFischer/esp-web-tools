@@ -115,6 +115,9 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _fetchConfigs() {
+    if (this._expertMode) {
+      return; // Do not fetch configs in expert mode
+    }
     try {
       const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
         method: 'GET',
@@ -130,8 +133,10 @@ export class EwtInstallDialog extends LitElement {
       // Store the entire configuration objects, not just the ids
       this._existingConfigs = await response.json();
     } catch (error) {
-      console.error('Error fetching configurations:', error);
-      alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
+      if (!this._expertMode) {
+        console.error('Error fetching configurations:', error);
+        alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
+      }
     }
   }
 
@@ -356,19 +361,28 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _startVerifyConfig() {
-    // Reset the ESP32
-    await this._resetESP32();
+    // Set a timeout for the verification process
+    const verificationTimeout = 30000; // 30 seconds
+    const timeoutPromise = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error("Verification timed out")), verificationTimeout)
+    );
 
-    // Read the output from the ESP32
-    const configOutput = await this._readESP32Output();
+    try {
+      // Read the output from the ESP32 with a timeout
+      const configOutput = await Promise.race([this._readESP32Output(), timeoutPromise]);
 
-    // Verify the configuration
-    const isConfigValid = this._verifyConfig(configOutput);
+      // Verify the configuration
+      const isConfigValid = this._verifyConfig(configOutput);
 
-    if (isConfigValid) {
-      this._state = "VERIFY_CONFIG_RESULT";
-      this._verifyConfigResult = true;
-    } else {
+      if (isConfigValid) {
+        this._state = "VERIFY_CONFIG_RESULT";
+        this._verifyConfigResult = true;
+      } else {
+        this._state = "VERIFY_CONFIG_RESULT";
+        this._verifyConfigResult = false;
+      }
+    } catch (error) {
+      console.error('Verification failed:', error);
       this._state = "VERIFY_CONFIG_RESULT";
       this._verifyConfigResult = false;
     }
@@ -380,6 +394,7 @@ export class EwtInstallDialog extends LitElement {
     let hideActions = false;
 
     if (this._verifyConfigResult) {
+      this._resetESP32();
       heading = "Configuration Verified";
       content = html`
         <ewt-page-message
@@ -429,19 +444,19 @@ export class EwtInstallDialog extends LitElement {
 
   private async _readESP32Output(): Promise<string> {
     let output = "";
+    let reader: ReadableStreamDefaultReader<Uint8Array>;
+    let inputStream: ReadableStreamDefaultReader<string>;
+
     if (this.port.readable) {
-      const reader = this.port.readable.getReader();
-      const decoder = new TextDecoderStream();
-      
-      // Check if the stream is locked before piping
       if (!this.port.readable.locked) {
+        reader = this.port.readable.getReader();
+        const decoder = new TextDecoderStream();
         this.port.readable.pipeTo(decoder.writable);
+        inputStream = decoder.readable.getReader();
       } else {
         console.error('The readable stream is already locked');
         return output;
       }
-
-      const inputStream = decoder.readable.getReader();
 
       try {
         while (true) {
@@ -696,7 +711,9 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
-    this._fetchConfigs();
+    if (!this._expertMode) {
+      this._fetchConfigs();
+    }
     let heading: string | undefined = `Configuration`;
     let content: TemplateResult;
     let hideActions = false;
@@ -1048,7 +1065,7 @@ export class EwtInstallDialog extends LitElement {
       "params": object
     };
     // Check if the API key or callback url are blank
-    if (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz') {
+    if (!this._expertMode && (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz')) {
       alert('Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
       return;
     }
