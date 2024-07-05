@@ -75,7 +75,11 @@ export class EwtInstallDialog extends LitElement {
     | "INSTALL"
     | "CONFIGURE"
     | "ASK_ERASE"
-    | "LOGS" = "DASHBOARD";
+    | "LOGS"
+    | "VERIFY_CONFIG"
+    | "VERIFY_CONFIG_RESULT" = "DASHBOARD";
+
+  @state() private _verifyConfigResult?: boolean;
 
   @state() private _installErase = false;
   @state() private _installConfirmed = false;
@@ -314,6 +318,10 @@ export class EwtInstallDialog extends LitElement {
       [heading, content, hideActions] = this._renderConfigure();
     } else if (this._state === "LOGS") {
       [heading, content, hideActions] = this._renderLogs();
+    } else if (this._state === "VERIFY_CONFIG") {
+      [heading, content, hideActions] = this._renderVerifyConfig();
+    } else if (this._state === "VERIFY_CONFIG_RESULT") {
+      [heading, content, hideActions] = this._renderVerifyConfigResult();
     }
 
     return html`
@@ -334,6 +342,126 @@ export class EwtInstallDialog extends LitElement {
         ${content!}
       </ewt-dialog>
     `;
+  }
+
+  private _renderVerifyConfig(): [string | undefined, TemplateResult, boolean] {
+    const heading = "Verifying Configuration";
+    const content = this._renderProgress("Verifying configuration...");
+    const hideActions = true;
+
+    // Start the verification process
+    this._startVerifyConfig();
+
+    return [heading, content, hideActions];
+  }
+
+  private async _startVerifyConfig() {
+    // Reset the ESP32
+    await this._resetESP32();
+
+    // Read the output from the ESP32
+    const configOutput = await this._readESP32Output();
+
+    // Verify the configuration
+    const isConfigValid = this._verifyConfig(configOutput);
+
+    if (isConfigValid) {
+      this._state = "VERIFY_CONFIG_RESULT";
+      this._verifyConfigResult = true;
+    } else {
+      this._state = "VERIFY_CONFIG_RESULT";
+      this._verifyConfigResult = false;
+    }
+  }
+
+  private _renderVerifyConfigResult(): [string | undefined, TemplateResult, boolean] {
+    let heading: string | undefined;
+    let content: TemplateResult;
+    let hideActions = false;
+
+    if (this._verifyConfigResult) {
+      heading = "Configuration Verified";
+      content = html`
+        <ewt-page-message
+          .icon=${OK_ICON}
+          label="Configuration verified successfully!"
+        ></ewt-page-message>
+        <ewt-button
+          slot="primaryAction"
+          label="OK"
+          @click=${() => {
+            this._state = "LOGS";
+          }}
+        ></ewt-button>
+      `;
+    } else {
+      heading = "Configuration Verification Failed";
+      content = html`
+        <ewt-page-message
+          .icon=${ERROR_ICON}
+          label="Configuration verification failed!"
+        ></ewt-page-message>
+        <ewt-button
+          slot="primaryAction"
+          label="Retry"
+          @click=${() => {
+            this._state = "CONFIGURE";
+          }}
+        ></ewt-button>
+      `;
+    }
+
+    return [heading, content, hideActions];
+  }
+
+  private async _resetESP32() {
+    // Implement the logic to reset the ESP32
+    // This might involve sending a specific command to the ESP32
+    if (this.port.writable) {
+      const writer = this.port.writable.getWriter();
+      const resetCommand = new TextEncoder().encode("RESET\n");
+      await writer.write(resetCommand);
+      writer.releaseLock();
+    } else {
+      console.error('The port is not writable');
+    }
+  }
+
+  private async _readESP32Output(): Promise<string> {
+    let output = "";
+    if (this.port.readable) {
+      const reader = this.port.readable.getReader();
+      const decoder = new TextDecoderStream();
+      this.port.readable.pipeTo(decoder.writable);
+      const inputStream = decoder.readable.getReader();
+
+      try {
+        while (true) {
+          const { value, done } = await inputStream.read();
+          if (done) {
+            break;
+          }
+          output += value;
+        }
+      } catch (error) {
+        console.error('Error reading from the port:', error);
+      } finally {
+        reader.releaseLock();
+      }
+    } else {
+      console.error('The port is not readable');
+    }
+    return output;
+  }
+
+  private _verifyConfig(output: string): boolean {
+    const callbackUrl = "https://api.opago-pay.com/lnurldevice/api/v1/lnurl/NQNPD";
+    const wifiSSID = "your-ssid";
+    const wifiPwd = "your-password";
+
+    return output.includes(callbackUrl) &&
+           output.includes(`wifiSSID=${wifiSSID}`) &&
+           output.includes(`wifiPwd=${wifiPwd}`);
   }
 
   _renderProgress(label: string | TemplateResult, progress?: number) {
@@ -490,6 +618,8 @@ export class EwtInstallDialog extends LitElement {
 
     return [heading, content, hideActions, allowClosing];
   }
+
+
   _renderDashboardNoImprov(): [string, TemplateResult, boolean, boolean] {
     const heading = "Device Dashboard";
     let content: TemplateResult;
@@ -1671,4 +1801,5 @@ declare global {
     "ewt-install-dialog": EwtInstallDialog;
   }
 }
+
 
