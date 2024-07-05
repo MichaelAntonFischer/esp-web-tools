@@ -68,16 +68,16 @@ export class EwtInstallDialog extends LitElement {
   // null = NOT_SUPPORTED
   @state() private _client?: ImprovSerial | null;
 
-  @state() private _state:
-    | "ERROR"
-    | "DASHBOARD"
-    | "PROVISION"
-    | "INSTALL"
-    | "CONFIGURE"
-    | "ASK_ERASE"
-    | "LOGS"
-    | "VERIFY_CONFIG"
-    | "VERIFY_CONFIG_RESULT" = "DASHBOARD";
+  @state() private _state: 
+    "ERROR" |
+    "DASHBOARD" |
+    "PROVISION" |
+    "INSTALL" |
+    "CONFIGURE" |
+    "ASK_ERASE" |
+    "LOGS" |
+    "VERIFY_CONFIG" |
+    "VERIFY_CONFIG_RESULT" = "DASHBOARD"; // Default state assigned to fix the error
 
   @state() private _verifyConfigResult?: boolean;
 
@@ -1071,8 +1071,7 @@ export class EwtInstallDialog extends LitElement {
       } 
       this.scanningSSIDs = false; 
       // Output the progress to a console-style window
-      this._state = "LOGS";
-      this.logger.log(`Configuration saved successfully.`);
+      this._state = "VERIFY_CONFIG";
     } catch (e) {
       this.logger.error(`There was an error saving the configuration: ${(e as Error).message}`);
     }
