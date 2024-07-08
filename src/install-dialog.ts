@@ -393,10 +393,9 @@ export class EwtInstallDialog extends LitElement {
     let heading: string | undefined;
     let content: TemplateResult;
     let hideActions = false;
-
+  
     if (this._verifyConfigResult) {
-      this._resetESP32();
-      heading = "Configuration Verified";
+      heading = "";
       content = html`
         <ewt-page-message
           .icon=${OK_ICON}
@@ -406,7 +405,13 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="OK"
           @click=${() => {
-            this._state = "LOGS";
+            this._state = "DASHBOARD";
+            const consoleElement = this.shadowRoot!.querySelector("ewt-console");
+            if (consoleElement) {
+              consoleElement.reset();
+            } else {
+              console.error("ewt-console element not found");
+            }
           }}
         ></ewt-button>
       `;
@@ -426,21 +431,8 @@ export class EwtInstallDialog extends LitElement {
         ></ewt-button>
       `;
     }
-
+  
     return [heading, content, hideActions];
-  }
-
-  private async _resetESP32() {
-    // Implement the logic to reset the ESP32
-    // This might involve sending a specific command to the ESP32
-    if (this.port.writable) {
-      const writer = this.port.writable.getWriter();
-      const resetCommand = new TextEncoder().encode("RESET\n");
-      await writer.write(resetCommand);
-      writer.releaseLock();
-    } else {
-      console.error('The port is not writable');
-    }
   }
 
   private async _readESP32Output(): Promise<string> {
@@ -455,25 +447,30 @@ export class EwtInstallDialog extends LitElement {
           console.log("Received chunk:", text);
           buffer += text;
           if (buffer.includes("Configurations saved successfully")) {
-            console.log("Success message found, resolving early");
-            reader.releaseLock();
+            console.log("Success message found");
             resolve(buffer);
           }
         };
   
-        reader.read().then(function processResult({ done, value }): Promise<void> | void {
-          if (done) {
-            console.log("Stream complete");
-            resolve(buffer);
-            return;
-          }
+        const readLoop = () => {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              console.log("Stream complete");
+              reader.releaseLock();
+              resolve(buffer);
+              return;
+            }
   
-          processText(decoder.decode(value, { stream: true }));
-          return reader.read().then(processResult);
-        }).catch(error => {
-          console.error('Error reading from the port:', error);
-          reject(error);
-        });
+            processText(decoder.decode(value, { stream: true }));
+            readLoop();
+          }).catch(error => {
+            console.error('Error reading from the port:', error);
+            reader.releaseLock();
+            reject(error);
+          });
+        };
+  
+        readLoop();
       } else {
         console.error('The port is not readable');
         reject(new Error('The port is not readable'));
