@@ -401,6 +401,7 @@ export class EwtInstallDialog extends LitElement {
           .icon=${OK_ICON}
           label="Configuration verified successfully!"
         ></ewt-page-message>
+        <ewt-console .port=${this.port} .logger=${this.logger} style="display: none;"></ewt-console>
         <ewt-button
           slot="primaryAction"
           label="OK"
