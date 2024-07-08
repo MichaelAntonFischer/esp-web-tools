@@ -263,7 +263,8 @@ export class EwtInstallDialog extends LitElement {
       try {
         const response = await this._scanSSIDs();
         if (response && response.result) {
-          const ssids = response.result; // Directly use the result array
+          // Ensure that the result is an array of SSIDs
+          const ssids = Array.isArray(response.result) ? response.result : [];
           console.log('Parsed SSIDs:', ssids);
 
           if (ssids.length > 0) {
