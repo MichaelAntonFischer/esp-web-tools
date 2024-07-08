@@ -263,25 +263,15 @@ export class EwtInstallDialog extends LitElement {
       try {
         const response = await this._scanSSIDs();
         if (response && response.result) {
-          // Ensure that the result is a valid JSON string and parse it
-          let ssids;
-          try {
-            ssids = JSON.parse(response.result);
-            if (!Array.isArray(ssids)) {
-              throw new Error("Parsed result is not an array");
-            }
-          } catch (error) {
-            console.error("Failed to parse SSIDs:", error);
-            ssids = [];
-          }
+          const ssids = response.result; // Directly use the result array
           console.log('Parsed SSIDs:', ssids);
-
-          if (ssids.length > 0) {
+  
+          if (Array.isArray(ssids) && ssids.length > 0) {
             this.availableSSIDs = Array.from(new Set([...this.availableSSIDs, ...ssids]));
             console.log('Updated SSIDs:', this.availableSSIDs);
             this.requestUpdate();
           } else {
-            console.log('No new SSIDs found');
+            console.log('No new SSIDs found or SSIDs are not in array format');
           }
         } else {
           console.log('Response did not contain SSIDs:', response);
