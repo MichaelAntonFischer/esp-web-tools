@@ -361,25 +361,26 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _startVerifyConfig() {
-    // Set a timeout for the verification process
+    console.log("Starting config verification");
     const verificationTimeout = 30000; // 30 seconds
-    const timeoutPromise = new Promise<string>((_, reject) =>
-      setTimeout(() => reject(new Error("Verification timed out")), verificationTimeout)
-    );
-
+  
     try {
-      // Read the output from the ESP32 with a timeout
-      const configOutput = await Promise.race([this._readESP32Output(), timeoutPromise]);
-
-      // Verify the configuration
-      const isConfigValid = this._verifyConfig(configOutput);
-
+      console.log("Reading ESP32 output");
+      const configOutput = await Promise.race([
+        this._readESP32Output(),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error("Verification timed out")), verificationTimeout))
+      ]);
+      console.log("ESP32 output read complete");
+      const isConfigValid = this._verifyConfig(configOutput as string);
+  
+      this._state = "VERIFY_CONFIG_RESULT";
+      this._verifyConfigResult = isConfigValid;
+  
       if (isConfigValid) {
-        this._state = "VERIFY_CONFIG_RESULT";
-        this._verifyConfigResult = true;
+        console.log("Configuration verified successfully");
       } else {
-        this._state = "VERIFY_CONFIG_RESULT";
-        this._verifyConfigResult = false;
+        console.error("Configuration verification failed");
+        console.log("Received output:", configOutput);
       }
     } catch (error) {
       console.error('Verification failed:', error);
@@ -443,40 +444,50 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _readESP32Output(): Promise<string> {
-    let output = "";
-    const decoder = new TextDecoder();
-
-    if (this.port.readable) {
-      const reader = this.port.readable.getReader();
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) {
-            break;
+    return new Promise((resolve, reject) => {
+      let buffer = "";
+      const decoder = new TextDecoder();
+  
+      if (this.port.readable) {
+        const reader = this.port.readable.getReader();
+  
+        const processText = (text: string) => {
+          console.log("Received chunk:", text);
+          buffer += text;
+          if (buffer.includes("Configurations saved successfully")) {
+            console.log("Success message found, resolving early");
+            reader.releaseLock();
+            resolve(buffer);
           }
-          const chunk = decoder.decode(value, { stream: true });
-          console.log(chunk);  // Output each chunk read to the console
-          output += chunk;
-        }
-      } catch (error) {
-        console.error('Error reading from the port:', error);
-      } finally {
-        reader.releaseLock();
+        };
+  
+        reader.read().then(function processResult({ done, value }): Promise<void> | void {
+          if (done) {
+            console.log("Stream complete");
+            resolve(buffer);
+            return;
+          }
+  
+          processText(decoder.decode(value, { stream: true }));
+          return reader.read().then(processResult);
+        }).catch(error => {
+          console.error('Error reading from the port:', error);
+          reject(error);
+        });
+      } else {
+        console.error('The port is not readable');
+        reject(new Error('The port is not readable'));
       }
-    } else {
-      console.error('The port is not readable');
-    }
-    return output;
+    });
   }
 
   private _verifyConfig(output: string): boolean {
-    const callbackUrl = "https://api.opago-pay.com/lnurldevice/api/v1/lnurl/NQNPD";
-    const wifiSSID = "your-ssid";
-    const wifiPwd = "your-password";
-
-    return output.includes(callbackUrl) &&
-           output.includes(`wifiSSID=${wifiSSID}`) &&
-           output.includes(`wifiPwd=${wifiPwd}`);
+    console.log("Verifying config with output:", output);
+    const successMessage = "Configurations saved successfully";
+    const isValid = output.includes(successMessage);
+    console.log(`Config verification result: ${isValid}`);
+    console.log(`Success message "${successMessage}" ${isValid ? 'found' : 'not found'} in output`);
+    return isValid;
   }
 
   _renderProgress(label: string | TemplateResult, progress?: number) {
