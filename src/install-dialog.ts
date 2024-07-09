@@ -135,13 +135,16 @@ export class EwtInstallDialog extends LitElement {
     if (this._reader) {
       const reader = this._reader;
       this._reader = null;
-      this._readerLock = new Promise<void>((resolve) => {
+      try {
         reader.releaseLock();
-        setTimeout(resolve, 100); // Add a small delay before allowing a new reader
-      });
-      await this._readerLock;
-      this._readerLock = null;
+      } catch (error) {
+        console.warn('Error releasing reader lock:', error);
+        // The reader might already be released, so we can ignore this error
+      }
+      // Wait a short time before allowing a new reader to be created
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
+    this._readerLock = null;
   }
 
   private async _fetchConfigs() {
@@ -396,28 +399,24 @@ export class EwtInstallDialog extends LitElement {
   
     try {
       console.log("Reading ESP32 output");
-      const configOutput = await Promise.race([
-        this._readESP32Output(),
-        new Promise<string>((_, reject) => setTimeout(() => reject(new Error("Verification timed out")), verificationTimeout))
-      ]);
+      const configOutput = await this._readESP32Output(verificationTimeout);
       console.log("ESP32 output read complete");
       const isConfigValid = this._verifyConfig(configOutput);
   
-      this._state = "VERIFY_CONFIG_RESULT";
-      this._verifyConfigResult = isConfigValid;
-  
       if (isConfigValid) {
         console.log("Configuration verified successfully");
+        this._state = "VERIFY_CONFIG_RESULT";
+        this._verifyConfigResult = true;
       } else {
         console.error("Configuration verification failed");
         console.log("Received output:", configOutput);
+        this._state = "VERIFY_CONFIG_RESULT";
+        this._verifyConfigResult = false;
       }
     } catch (error) {
       console.error('Verification failed:', error);
       this._state = "VERIFY_CONFIG_RESULT";
       this._verifyConfigResult = false;
-    } finally {
-      await this.releaseReader(); // Ensure we release the reader after verification
     }
   }
 
@@ -468,10 +467,13 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions];
   }
 
-  private async _readESP32Output(): Promise<string> {
+  private async _readESP32Output(timeout: number = 30000): Promise<string> {
     return new Promise<string>(async (resolve, reject) => {
       let buffer = "";
       const decoder = new TextDecoder();
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Read operation timed out"));
+      }, timeout);
   
       try {
         const reader = await this.getReader();
@@ -481,30 +483,27 @@ export class EwtInstallDialog extends LitElement {
           buffer += text;
           if (buffer.includes("Configurations saved successfully")) {
             console.log("Success message found");
-            resolve(buffer);
+            clearTimeout(timeoutId);
+            return true; // Signal to stop reading
           }
+          return false;
         };
   
-        const readLoop = async () => {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                console.log("Stream complete");
-                resolve(buffer);
-                return;
-              }
-              processText(decoder.decode(value, { stream: true }));
-            }
-          } catch (error) {
-            console.error('Error reading from the port:', error);
-            reject(error);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log("Stream complete");
+            break;
           }
-        };
-  
-        await readLoop();
+          if (processText(decoder.decode(value, { stream: true }))) {
+            break; // Stop reading if success message is found
+          }
+        }
+        clearTimeout(timeoutId);
+        resolve(buffer);
       } catch (error) {
-        console.error('Failed to get reader:', error);
+        console.error('Error reading from the port:', error);
+        clearTimeout(timeoutId);
         reject(error);
       } finally {
         await this.releaseReader();
