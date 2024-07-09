@@ -53,6 +53,8 @@ export class EwtInstallDialog extends LitElement {
   public logger: Logger = console;
 
   private _expertMode: boolean = false;
+  private _reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  private _readerLock: Promise<void> | null = null;
 
   public overrides?: {
     checkSameFirmware?: (
@@ -112,6 +114,30 @@ export class EwtInstallDialog extends LitElement {
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
+  }
+
+  private async getReader(): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+    if (this._readerLock) {
+      await this._readerLock;
+    }
+  
+    if (!this._reader) {
+      if (!this.port || !this.port.readable) {
+        throw new Error("Serial port is not available or readable");
+      }
+      this._reader = this.port.readable.getReader();
+    }
+  
+    return this._reader;
+  }
+  
+  private async releaseReader(): Promise<void> {
+    if (this._reader) {
+      const reader = this._reader;
+      this._reader = null;
+      reader.releaseLock();
+      this._readerLock = null;
+    }
   }
 
   private async _fetchConfigs() {
@@ -259,11 +285,11 @@ export class EwtInstallDialog extends LitElement {
 
   private async _populateDropdownWithSSIDs() {
     if (!this.scanningSSIDs) {
-      this.scanningSSIDs = true; // Set scanningSSIDs to true before starting the scan
+      this.scanningSSIDs = true;
       try {
         const response = await this._scanSSIDs();
         if (response && response.result) {
-          const ssids = response.result; // Directly use the result array
+          const ssids = response.result;
           console.log('Parsed SSIDs:', ssids);
   
           if (Array.isArray(ssids) && ssids.length > 0) {
@@ -279,7 +305,7 @@ export class EwtInstallDialog extends LitElement {
       } catch (error) {
         console.error("Failed to process SSIDs:", error);
       } finally {
-        this.scanningSSIDs = false; // Set scanningSSIDs to false after the scan is complete
+        this.scanningSSIDs = false;
       }
     } else {
       console.log("SSID scan is already in progress.");
@@ -371,7 +397,7 @@ export class EwtInstallDialog extends LitElement {
         new Promise<string>((_, reject) => setTimeout(() => reject(new Error("Verification timed out")), verificationTimeout))
       ]);
       console.log("ESP32 output read complete");
-      const isConfigValid = this._verifyConfig(configOutput as string);
+      const isConfigValid = this._verifyConfig(configOutput);
   
       this._state = "VERIFY_CONFIG_RESULT";
       this._verifyConfigResult = isConfigValid;
@@ -386,6 +412,8 @@ export class EwtInstallDialog extends LitElement {
       console.error('Verification failed:', error);
       this._state = "VERIFY_CONFIG_RESULT";
       this._verifyConfigResult = false;
+    } finally {
+      await this.releaseReader(); // Ensure we release the reader after verification
     }
   }
 
@@ -437,13 +465,13 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _readESP32Output(): Promise<string> {
-    return new Promise((resolve, reject) => {
+    return new Promise<string>(async (resolve, reject) => {
       let buffer = "";
       const decoder = new TextDecoder();
   
-      if (this.port.readable) {
-        const reader = this.port.readable.getReader();
-  
+      try {
+        const reader = await this.getReader();
+        
         const processText = (text: string) => {
           console.log("Received chunk:", text);
           buffer += text;
@@ -453,28 +481,29 @@ export class EwtInstallDialog extends LitElement {
           }
         };
   
-        const readLoop = () => {
-          reader.read().then(({ done, value }) => {
-            if (done) {
-              console.log("Stream complete");
-              reader.releaseLock();
-              resolve(buffer);
-              return;
+        const readLoop = async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                console.log("Stream complete");
+                resolve(buffer);
+                return;
+              }
+              processText(decoder.decode(value, { stream: true }));
             }
-  
-            processText(decoder.decode(value, { stream: true }));
-            readLoop();
-          }).catch(error => {
+          } catch (error) {
             console.error('Error reading from the port:', error);
-            reader.releaseLock();
             reject(error);
-          });
+          }
         };
   
-        readLoop();
-      } else {
-        console.error('The port is not readable');
-        reject(new Error('The port is not readable'));
+        await readLoop();
+      } catch (error) {
+        console.error('Failed to get reader:', error);
+        reject(error);
+      } finally {
+        await this.releaseReader();
       }
     });
   }
@@ -900,56 +929,50 @@ export class EwtInstallDialog extends LitElement {
       "params": {}
     };
   
-    // Write the data to the serial port
-    if (this.port && this.port.writable) {
-      const writer = this.port.writable.getWriter();
-      const encoder = new TextEncoder();
-      const dataStr = JSON.stringify(data) + "\n";
-      const encodedData = encoder.encode(dataStr);
-      await writer.write(encodedData);
-      writer.releaseLock();
-    } else {
+    if (!this.port || !this.port.writable) {
       throw new Error("Serial port is not open or writable");
     }
   
-    // Read the response from the serial port
-    if (this.port && this.port.readable) {
-      const reader = this.port.readable.getReader();
-      try {
-        let completeData = '';
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) {
-            break;
-          }
-          const textDecoder = new TextDecoder();
-          const chunk = textDecoder.decode(value, { stream: true });
-          completeData += chunk;
+    // Write the data to the serial port
+    const writer = this.port.writable.getWriter();
+    const encoder = new TextEncoder();
+    const dataStr = JSON.stringify(data) + "\n";
+    const encodedData = encoder.encode(dataStr);
+    await writer.write(encodedData);
+    writer.releaseLock();
   
-          // Check if the complete data contains one or more complete JSON responses
-          let jsonResponses = this.extractJsonResponses(completeData);
-          if (jsonResponses.length > 0) {
-            // Remove the parsed JSON responses from the complete data
-            completeData = completeData.slice(completeData.lastIndexOf('}') + 1);
-            
-            // Find the response that is different from the sent data
-            let response = jsonResponses.find(resp => JSON.stringify(resp) !== JSON.stringify(data));
-            if (response) {
-              console.log("Parsed JSON response:", response);
-              reader.releaseLock(); // Release the reader lock before returning
-              return response;
-            }
+    try {
+      const reader = await this.getReader();
+      let completeData = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        const textDecoder = new TextDecoder();
+        const chunk = textDecoder.decode(value, { stream: true });
+        completeData += chunk;
+  
+        // Check if the complete data contains one or more complete JSON responses
+        let jsonResponses = this.extractJsonResponses(completeData);
+        if (jsonResponses.length > 0) {
+          // Remove the parsed JSON responses from the complete data
+          completeData = completeData.slice(completeData.lastIndexOf('}') + 1);
+          
+          // Find the response that is different from the sent data
+          let response = jsonResponses.find(resp => JSON.stringify(resp) !== JSON.stringify(data));
+          if (response) {
+            console.log("Parsed JSON response:", response);
+            return response;
           }
         }
-        reader.releaseLock(); // Release the reader lock if no valid response is found
-        throw new Error("No valid JSON response received from the serial port");
-      } catch (error) {
-        console.error('Error reading from serial port:', error);
-        reader.releaseLock(); // Release the reader lock in case of an error
-        throw error;
       }
-    } else {
-      throw new Error("Serial port is not open or readable");
+      throw new Error("No valid JSON response received from the serial port");
+    } catch (error) {
+      console.error('Error reading from serial port:', error);
+      throw error;
+    } finally {
+      await this.releaseReader();
     }
   }
   
@@ -1079,7 +1102,7 @@ export class EwtInstallDialog extends LitElement {
     }
     // Send the configuration to the ESP32 via JSON-RPC
     try {
-      if (!this.port || this.port.readable === null || this.port.writable === null) {
+      if (!this.port || this.port.writable === null) {
         this.port = await navigator.serial.requestPort();
         await this.port.open({ baudRate: 115200 });
       }
@@ -1088,18 +1111,20 @@ export class EwtInstallDialog extends LitElement {
         const writer = this.port.writable.getWriter();
         const encoder = new TextEncoder();
         const dataStr = JSON.stringify(data);
-        console.log("Sending:", dataStr);  // log data before sending
-        const encodedData = encoder.encode(dataStr + "\n"); // add newline character at the end
+        console.log("Sending:", dataStr);
+        const encodedData = encoder.encode(dataStr + "\n");
         await writer.write(encodedData);
         writer.releaseLock();
       } else {
         console.error('The port is not writable');
-      } 
-      this.scanningSSIDs = false; 
+      }
+      
       // Output the progress to a console-style window
       this._state = "VERIFY_CONFIG";
     } catch (e) {
       this.logger.error(`There was an error saving the configuration: ${(e as Error).message}`);
+    } finally {
+      this.scanningSSIDs = false;
     }
   }
 
