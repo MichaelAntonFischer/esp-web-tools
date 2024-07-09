@@ -53,8 +53,8 @@ export class EwtInstallDialog extends LitElement {
   public logger: Logger = console;
 
   private _expertMode: boolean = false;
-  private _reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   private _readerLock: Promise<void> | null = null;
+  private _reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   public overrides?: {
     checkSameFirmware?: (
@@ -135,7 +135,11 @@ export class EwtInstallDialog extends LitElement {
     if (this._reader) {
       const reader = this._reader;
       this._reader = null;
-      reader.releaseLock();
+      this._readerLock = new Promise<void>((resolve) => {
+        reader.releaseLock();
+        setTimeout(resolve, 100); // Add a small delay before allowing a new reader
+      });
+      await this._readerLock;
       this._readerLock = null;
     }
   }
