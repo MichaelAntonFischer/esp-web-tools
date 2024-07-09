@@ -414,9 +414,19 @@ export class EwtInstallDialog extends LitElement {
         this._verifyConfigResult = false;
       }
     } catch (error) {
-      console.error('Verification failed:', error);
-      this._state = "VERIFY_CONFIG_RESULT";
-      this._verifyConfigResult = false;
+      console.error('Error during verification:', error);
+      // Check if we've already set a successful result
+      if (this._verifyConfigResult !== true) {
+        this._state = "VERIFY_CONFIG_RESULT";
+        this._verifyConfigResult = false;
+      }
+    } finally {
+      try {
+        await this.releaseReader();
+      } catch (releaseError) {
+        console.warn('Error releasing reader:', releaseError);
+        // Ignore reader release errors
+      }
     }
   }
 
