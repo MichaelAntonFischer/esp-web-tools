@@ -382,6 +382,10 @@ export class EwtInstallDialog extends LitElement {
   private _lastScanTime = 0;
   private readonly SCAN_COOLDOWN = 5000; // 5 seconds between scans
 
+  private _currentReader?: ReadableStreamDefaultReader<Uint8Array>;
+  private _currentWriter?: WritableStreamDefaultWriter<Uint8Array>;
+  private _isPortLocked = false;
+
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
@@ -971,6 +975,62 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
+  private async _releaseStreams() {
+    try {
+      if (this._currentReader) {
+        try {
+          await this._currentReader.cancel();
+          this._currentReader.releaseLock();
+        } catch (e) {
+          console.log("Error releasing reader:", e);
+        }
+        this._currentReader = undefined;
+      }
+      
+      if (this._currentWriter) {
+        try {
+          await this._currentWriter.close();
+          this._currentWriter.releaseLock();
+        } catch (e) {
+          console.log("Error releasing writer:", e);
+        }
+        this._currentWriter = undefined;
+      }
+      
+      this._isPortLocked = false;
+    } catch (e) {
+      console.error("Error in _releaseStreams:", e);
+    }
+  }
+
+  private async _acquireStreams() {
+    if (this._isPortLocked) {
+      await this._releaseStreams();
+    }
+
+    if (!this.port || !this.port.readable || !this.port.writable) {
+      try {
+        await this.port?.close();
+      } catch (e) {
+        console.log("Port was already closed");
+      }
+      await this.port?.open({ baudRate: 115200 });
+      
+      if (!this.port || !this.port.readable || !this.port.writable) {
+        throw new Error("Failed to initialize port");
+      }
+    }
+
+    try {
+      this._currentReader = this.port.readable.getReader();
+      this._currentWriter = this.port.writable.getWriter();
+      this._isPortLocked = true;
+    } catch (e) {
+      await this._releaseStreams();
+      throw new Error("Failed to acquire streams: " + e);
+    }
+  }
+
   private async _saveConfiguration() {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
@@ -1056,109 +1116,63 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      if (!this.port || !this.port.writable || !this.port.readable) {
-        // Try to reopen the port if it's closed
-        try {
-          await this.port?.close();
-        } catch (e) {
-          console.log("Port was already closed");
-        }
-        await this.port?.open({ baudRate: 115200 });
-        
-        // If still not readable/writable, throw error
-        if (!this.port || !this.port.writable || !this.port.readable) {
-          throw new Error("Serial port is not properly initialized");
-        }
-      }
-
-      // Ensure any existing readers are released
+      // Release any existing streams and acquire fresh ones
+      await this._releaseStreams();
+      
+      // Ensure any existing console is disconnected
       const existingConsole = this.shadowRoot?.querySelector("ewt-console");
       if (existingConsole) {
         await existingConsole.disconnect();
       }
 
-      // Additional cleanup to ensure streams are unlocked
-      try {
-        if (this.port.readable) {
-          const reader = this.port.readable.getReader();
-          await reader.cancel();
-          reader.releaseLock();
-        }
-        if (this.port.writable) {
-          const writer = this.port.writable.getWriter();
-          await writer.close();
-          writer.releaseLock();
-        }
-      } catch (e) {
-        console.log("Stream cleanup error:", e);
-      }
-
-      // Reopen the port after cleanup
-      try {
-        await this.port.close();
-        await this.port.open({ baudRate: 115200 });
-      } catch (e) {
-        console.log("Port reopening error:", e);
-      }
+      // Acquire fresh streams
+      await this._acquireStreams();
 
       // Send configuration
-      const writer = this.port.writable.getWriter();
       try {
         const encoder = new TextEncoder();
         const dataStr = JSON.stringify(data);
         window.console.log("Sending:", dataStr);
         const encodedData = encoder.encode(dataStr + "\n");
-        await writer.write(encodedData);
-      } finally {
-        writer.releaseLock();
+        await this._currentWriter!.write(encodedData);
+      } catch (e) {
+        throw new Error("Failed to write configuration: " + e);
       }
 
-      // Wait for confirmation using pipe pattern
+      // Wait for confirmation
       let configSaved = false;
+      let accumulatedChunk = '';
       const decoder = new TextDecoder();
-      const reader = this.port.readable.getReader();
-      let accumulatedChunk = ''; // Add this to accumulate chunks
 
       try {
-        // Set a timeout of 5 seconds
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error("Timeout waiting for configuration confirmation")), 5000);
         });
 
-        // Read response with timeout
         const readPromise = (async () => {
           while (!configSaved) {
-            const { value, done } = await reader.read();
+            const { value, done } = await this._currentReader!.read();
             if (done) break;
             
             const chunk = decoder.decode(value);
-            console.log("Received:", chunk); // Debug log
+            console.log("Received:", chunk);
             
-            // Accumulate chunks and check for success message
             accumulatedChunk += chunk;
             
-            // Check for various success indicators
             if (accumulatedChunk.includes("[info] Configurations saved successfully") || 
                 (accumulatedChunk.includes("[info] Saving") && 
                  accumulatedChunk.includes("[info] JSON-RPC command received: setconfig"))) {
               configSaved = true;
               
               // Send restart command
-              if (this.port?.writable) {
-                const restartWriter = this.port.writable.getWriter();
-                try {
-                  const resetCmd = {
-                    jsonrpc: "2.0",
-                    id: "2",
-                    method: "restart",
-                    params: {}
-                  };
-                  const resetEncoder = new TextEncoder();
-                  await restartWriter.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
-                } finally {
-                  restartWriter.releaseLock();
-                }
-              }
+              const resetCmd = {
+                jsonrpc: "2.0",
+                id: "2",
+                method: "restart",
+                params: {}
+              };
+              const resetEncoder = new TextEncoder();
+              await this._currentWriter!.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
               
               this._state = "SUCCESS_MESSAGE";
               break;
@@ -1172,14 +1186,13 @@ export class EwtInstallDialog extends LitElement {
         if (!configSaved) {
           throw new Error("Failed to receive configuration confirmation: " + (e as Error).message);
         }
-      } finally {
-        reader.releaseLock();
       }
 
     } catch (e) {
       this._state = "ERROR";
       this._error = `Failed to save configuration: ${(e as Error).message}`;
     } finally {
+      await this._releaseStreams();
       this.scanningSSIDs = false;
     }
   }
@@ -1359,6 +1372,11 @@ export class EwtInstallDialog extends LitElement {
     if (changedProps.has("_state")) {
       this._resetScanningState();
       
+      // Clean up streams when changing states
+      if (this._state !== "CONFIGURE" && this._isPortLocked) {
+        this._releaseStreams();
+      }
+      
       // Disconnect console when leaving logs view
       if (changedProps.get("_state") === "LOGS") {
         const console = this.shadowRoot?.querySelector("ewt-console");
@@ -1462,30 +1480,14 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _handleClose() {
-    try {
-      if (this.port.readable) {
-        const reader = this.port.readable.getReader();
-        try {
-          await reader.cancel();
-        } finally {
-          reader.releaseLock();
-        }
-      }
-      if (this.port.writable) {
-        const writer = this.port.writable.getWriter();
-        try {
-          await writer.close();
-        } finally {
-          writer.releaseLock();
-        }
-      }
-    } catch (e) {
-      console.error("Error cleaning up streams:", e);
-    }
+    await this._releaseStreams();
     
-    this.scanningSSIDs = false;
-    if (this._scanTimeout) {
-      clearTimeout(this._scanTimeout);
+    if (this.port) {
+      try {
+        await this.port.close();
+      } catch (e) {
+        console.error("Error closing port:", e);
+      }
     }
     
     fireEvent(this, "closed" as any);
