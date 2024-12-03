@@ -252,16 +252,16 @@ const translations = {
   }
 };
 
-function getTranslation(key: string, language: string = 'en'): string {
-  // Default to English if the language or key doesn't exist
+type SupportedLanguages = 'en' | 'de' | 'fr' | 'es' | 'it';
+
+function getTranslation(key: keyof typeof translations.en, userLanguage: string = 'en'): string {
+  // Convert user language to supported language, defaulting to 'en'
+  const language = (userLanguage in translations) ? userLanguage as SupportedLanguages : 'en';
   return translations[language]?.[key] || translations.en[key] || key;
 }
 
 @customElement('ewt-install-dialog')
 export class EwtInstallDialog extends LitElement {
-  @property({ type: String })
-  language = 'en';  // Default to English
-
   public port!: SerialPort;
 
   public manifestPath!: string;
@@ -549,14 +549,14 @@ export class EwtInstallDialog extends LitElement {
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
     if (!this._manifest) {
       return [
-        getTranslation("loading", this.language),
-        html`<div>${getTranslation("loadingManifest", this.language)}</div>`,
+        getTranslation("loading", "{{ user.language }}"),
+        html`<div>${getTranslation("loadingManifest", "{{ user.language }}")}</div>`,
         true,
         false
       ];
     }
 
-    const heading = getTranslation("deviceDashboard", this.language);
+    const heading = getTranslation("deviceDashboard", "{{ user.language }}");
     let content: TemplateResult;
     let hideActions = true;
     let allowClosing = true;
@@ -621,7 +621,7 @@ export class EwtInstallDialog extends LitElement {
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
-    let heading: string | undefined = getTranslation("deviceDashboard", this.language);
+    let heading: string | undefined = getTranslation("deviceDashboard", "{{ user.language }}");
     let content: TemplateResult;
     let hideActions = false;
   
@@ -642,7 +642,7 @@ export class EwtInstallDialog extends LitElement {
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
-        <label>${getTranslation("expertMode", this.language)}:</label>
+        <label>${getTranslation("expertMode", "{{ user.language }}")}:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="checkbox" id="expertMode" name="expertMode" .checked=${this._expertMode} @change=${this._toggleExpertMode} />
