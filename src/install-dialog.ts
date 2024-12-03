@@ -1444,12 +1444,38 @@ export class EwtInstallDialog extends LitElement {
         slot="primaryAction"
         label=${getTranslation("back", language)}
         @click=${async () => {
-          const console = this.shadowRoot!.querySelector("ewt-console");
-          if (console) {
-            await console.disconnect();
+          try {
+            // First disconnect console
+            const console = this.shadowRoot!.querySelector("ewt-console");
+            if (console) {
+              await console.disconnect();
+            }
+
+            // Give time for cleanup
+            await sleep(100);
+
+            // Close and reopen port
+            try {
+              await this.port.close();
+            } catch (e) {
+              console.log("Port was already closed");
+            }
+
+            await sleep(100);
+            
+            await this.port.open({ baudRate: 115200 });
+            
+            // Wait for port to be ready
+            await sleep(100);
+
+            this._state = "DASHBOARD";
+            this._initialize();
+          } catch (e) {
+            console.error("Error cleaning up console:", e);
+            // Try to recover
+            this._state = "DASHBOARD";
+            this._initialize();
           }
-          this._state = "DASHBOARD";
-          this._initialize();
         }}
       ></ewt-button>
       <ewt-button
@@ -1469,7 +1495,11 @@ export class EwtInstallDialog extends LitElement {
         @click=${async () => {
           const console = this.shadowRoot!.querySelector("ewt-console");
           if (console) {
-            await console.reset();
+            try {
+              await console.reset();
+            } catch (e) {
+              console.error("Error resetting device:", e);
+            }
           }
         }}
       ></ewt-button>
@@ -1482,11 +1512,19 @@ export class EwtInstallDialog extends LitElement {
     if (changedProps.has("_state")) {
       this._resetScanningState();
       
-      // Disconnect console when leaving logs view
+      // Handle console cleanup when leaving logs view
       if (changedProps.get("_state") === "LOGS") {
         const console = this.shadowRoot?.querySelector("ewt-console");
         if (console) {
-          console.disconnect();
+          // First disconnect console
+          console.disconnect()
+            .then(() => sleep(100))
+            .then(() => this.port.close())
+            .then(() => sleep(100))
+            .then(() => this.port.open({ baudRate: 115200 }))
+            .catch(e => {
+              console.error("Error cleaning up console:", e);
+            });
         }
       }
 
@@ -1565,44 +1603,72 @@ export class EwtInstallDialog extends LitElement {
               // Wait for device to reset
               await sleep(1000);
   
-              // Close any existing connection
+              // Close any existing connection and cleanup streams
               try {
+                // First try to release any locked streams
+                if (this.port.readable?.locked) {
+                  const reader = this.port.readable.getReader();
+                  await reader.cancel();
+                  reader.releaseLock();
+                }
+                if (this.port.writable?.locked) {
+                  const writer = this.port.writable.getWriter();
+                  await writer.close();
+                  writer.releaseLock();
+                }
+
                 await this.port.close();
               } catch (e) {
-                console.log("Port was already closed");
+                window.console.log("Port cleanup error:", e);
               }
-  
+
               // Wait a bit more after closing
               await sleep(500);
-  
+
               // Open fresh connection
               await this.port.open({ baudRate: 115200 });
-  
+
               // Wait for port to be fully ready
               await sleep(500);
-  
+
+              // Double check no streams are locked
+              if (this.port.readable?.locked || this.port.writable?.locked) {
+                throw new Error("Streams are still locked after port reopening");
+              }
+
               // Verify port is properly initialized
               if (!this.port.readable || !this.port.writable) {
                 throw new Error("Failed to initialize port after installation");
               }
-  
+
               await this._initialize(true);
               this._state = "CONFIGURE";
               this.requestUpdate();
   
             } catch (e) {
-              console.error("Error setting up port after installation:", e);
+              window.console.error("Error setting up port after installation:", e);
               this._state = "ERROR";
               this._error = `Failed to initialize port after installation: ${(e instanceof Error ? e.message : String(e))}`;
             }
           } else if (state.state === FlashStateType.ERROR) {
             try {
-              await sleep(500);
+              // Same cleanup process for error state
+              if (this.port.readable?.locked) {
+                const reader = this.port.readable.getReader();
+                await reader.cancel();
+                reader.releaseLock();
+              }
+              if (this.port.writable?.locked) {
+                const writer = this.port.writable.getWriter();
+                await writer.close();
+                writer.releaseLock();
+              }
+
               await this.port.close();
               await sleep(500);
               await this.port.open({ baudRate: 115200 });
             } catch (e) {
-              console.error("Error recovering from flash error:", e);
+              window.console.error("Error recovering from flash error:", e);
             }
           }
         },
