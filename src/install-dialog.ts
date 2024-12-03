@@ -1008,6 +1008,19 @@ export class EwtInstallDialog extends LitElement {
       await this._releaseStreams();
     }
 
+    // First, ensure any console component is disconnected
+    const existingConsole = this.shadowRoot?.querySelector("ewt-console");
+    if (existingConsole) {
+      try {
+        await existingConsole.disconnect();
+        // Give a small delay to ensure cleanup
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (e) {
+        console.log("Console disconnect error:", e);
+      }
+    }
+
+    // Then try to reopen the port if needed
     if (!this.port || !this.port.readable || !this.port.writable) {
       try {
         await this.port?.close();
@@ -1021,7 +1034,31 @@ export class EwtInstallDialog extends LitElement {
       }
     }
 
+    // Add additional checks for locked streams
     try {
+      if (this.port.readable.locked) {
+        console.log("Readable stream is locked, attempting to force release");
+        try {
+          const reader = this.port.readable.getReader();
+          await reader.cancel();
+          reader.releaseLock();
+        } catch (e) {
+          console.log("Error forcing readable stream unlock:", e);
+        }
+      }
+      
+      if (this.port.writable.locked) {
+        console.log("Writable stream is locked, attempting to force release");
+        try {
+          const writer = this.port.writable.getWriter();
+          await writer.close();
+          writer.releaseLock();
+        } catch (e) {
+          console.log("Error forcing writable stream unlock:", e);
+        }
+      }
+
+      // Now try to acquire the streams
       this._currentReader = this.port.readable.getReader();
       this._currentWriter = this.port.writable.getWriter();
       this._isPortLocked = true;
@@ -1116,16 +1153,13 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      // Release any existing streams and acquire fresh ones
+      // First ensure streams are released
       await this._releaseStreams();
-      
-      // Ensure any existing console is disconnected
-      const existingConsole = this.shadowRoot?.querySelector("ewt-console");
-      if (existingConsole) {
-        await existingConsole.disconnect();
-      }
 
-      // Acquire fresh streams
+      // Add a small delay to ensure cleanup
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Then acquire fresh streams
       await this._acquireStreams();
 
       // Send configuration
