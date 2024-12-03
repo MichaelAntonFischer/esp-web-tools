@@ -78,6 +78,22 @@ const translations = {
     demoModeConfirm: "Are you sure you want to put the device in Demo Mode?",
     connectionError: "Serial port is not readable/writable. Close any other application using it and try again.",
     manifestError: "Failed to download manifest",
+    error: "Error",
+    configure: "Configure",
+    logsAndConsole: "Logs & Console",
+    installDevice: "Install",
+    downloadLogsButton: "Download Logs",
+    resetDeviceButton: "Reset Device",
+    confirmEraseTitle: "Erase device",
+    confirmEraseMessage: "Do you want to erase the device before installing",
+    confirmEraseWarning: "All data on the device will be lost.",
+    apiKey: "API Key",
+    callbackUrl: "Callback URL",
+    fiatPrecision: "Fiat Precision",
+    batteryMaxVolts: "Battery Max Volts",
+    batteryMinVolts: "Battery Min Volts",
+    contrastLevel: "Contrast Level",
+    logLevel: "Log Level"
   },
   de: {
     loading: "Lädt...",
@@ -121,6 +137,22 @@ const translations = {
     demoModeConfirm: "Sind Sie sicher, dass Sie das Gerät in den Demo-Modus versetzen möchten?",
     connectionError: "Serieller Port ist nicht lesbar/beschreibbar. Schließen Sie alle anderen Anwendungen, die ihn verwenden, und versuchen Sie es erneut.",
     manifestError: "Manifest konnte nicht heruntergeladen werden",
+    error: "Fehler",
+    configure: "Konfigurieren",
+    logsAndConsole: "Logs & Konsole",
+    installDevice: "Installieren",
+    downloadLogsButton: "Logs herunterladen",
+    resetDeviceButton: "Gerät zurücksetzen",
+    confirmEraseTitle: "Gerät löschen",
+    confirmEraseMessage: "Möchten Sie das Gerät vor der Installation löschen",
+    confirmEraseWarning: "Alle Daten auf dem Gerät gehen verloren.",
+    apiKey: "API-Schlüssel",
+    callbackUrl: "Callback-URL",
+    fiatPrecision: "Fiat-Präzision",
+    batteryMaxVolts: "Batterie Max Volt",
+    batteryMinVolts: "Batterie Min Volt",
+    contrastLevel: "Kontraststufe",
+    logLevel: "Log-Level"
   },
   fr: {
     loading: "Chargement...",
@@ -164,6 +196,22 @@ const translations = {
     demoModeConfirm: "Êtes-vous sûr de vouloir mettre l'appareil en mode démo ?",
     connectionError: "Le port série n'est pas lisible/inscriptible. Fermez toute autre application l'utilisant et réessayez.",
     manifestError: "Échec du téléchargement du manifeste",
+    error: "Erreur",
+    configure: "Configurer",
+    logsAndConsole: "Journaux & Console",
+    installDevice: "Installer",
+    downloadLogsButton: "Télécharger les journaux",
+    resetDeviceButton: "Réinitialiser l'appareil",
+    confirmEraseTitle: "Effacer l'appareil",
+    confirmEraseMessage: "Voulez-vous effacer l'appareil avant l'installation",
+    confirmEraseWarning: "Toutes les données de l'appareil seront perdues.",
+    apiKey: "Clé API",
+    callbackUrl: "URL de callback",
+    fiatPrecision: "Précision Fiat",
+    batteryMaxVolts: "Tension max batterie",
+    batteryMinVolts: "Tension min batterie",
+    contrastLevel: "Niveau de contraste",
+    logLevel: "Niveau de log"
   },
   es: {
     loading: "Cargando...",
@@ -207,6 +255,22 @@ const translations = {
     demoModeConfirm: "¿Está seguro de que desea poner el dispositivo en modo demo?",
     connectionError: "El puerto serie no es legible/escribible. Cierre cualquier otra aplicación que lo esté usando e inténtelo de nuevo.",
     manifestError: "Error al descargar el manifiesto",
+    error: "Error",
+    configure: "Configurar",
+    logsAndConsole: "Registros y Consola",
+    installDevice: "Instalar",
+    downloadLogsButton: "Descargar registros",
+    resetDeviceButton: "Reiniciar dispositivo",
+    confirmEraseTitle: "Borrar dispositivo",
+    confirmEraseMessage: "¿Desea borrar el dispositivo antes de instalar",
+    confirmEraseWarning: "Se perderán todos los datos del dispositivo.",
+    apiKey: "Clave API",
+    callbackUrl: "URL de callback",
+    fiatPrecision: "Precisión Fiat",
+    batteryMaxVolts: "Voltaje máx. batería",
+    batteryMinVolts: "Voltaje mín. batería",
+    contrastLevel: "Nivel de contraste",
+    logLevel: "Nivel de registro"
   },
   it: {
     loading: "Caricamento...",
@@ -250,6 +314,22 @@ const translations = {
     demoModeConfirm: "Sei sicuro di voler mettere il dispositivo in modalità demo?",
     connectionError: "La porta seriale non è leggibile/scrivibile. Chiudi qualsiasi altra applicazione che la sta utilizzando e riprova.",
     manifestError: "Impossibile scaricare il manifesto",
+    error: "Errore",
+    configure: "Configura",
+    logsAndConsole: "Log e Console",
+    installDevice: "Installa",
+    downloadLogsButton: "Scarica log",
+    resetDeviceButton: "Ripristina dispositivo",
+    confirmEraseTitle: "Cancella dispositivo",
+    confirmEraseMessage: "Vuoi cancellare il dispositivo prima dell'installazione",
+    confirmEraseWarning: "Tutti i dati sul dispositivo andranno persi.",
+    apiKey: "Chiave API",
+    callbackUrl: "URL di callback",
+    fiatPrecision: "Precisione Fiat",
+    batteryMaxVolts: "Tensione max batteria",
+    batteryMinVolts: "Tensione min batteria",
+    contrastLevel: "Livello contrasto",
+    logLevel: "Livello log"
   }
 };
 
@@ -534,13 +614,13 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderError(label: string): [string, TemplateResult, boolean] {
-    const heading = "Error";
+    const heading = getTranslation("error", language);
     const content = html`
       <ewt-page-message .icon=${ERROR_ICON} .label=${label}></ewt-page-message>
       <ewt-button
         slot="primaryAction"
         dialogAction="ok"
-        label="Close"
+        label=${getTranslation("close", language)}
       ></ewt-button>
     `;
     const hideActions = false;
@@ -567,7 +647,7 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ewt-button
             text-left
-            .label=${`Install ${this._manifest.name}`}
+            .label=${`${getTranslation("installDevice", language)} ${this._manifest.name}`}
             @click=${() => {
               if (this._manifest.new_install_prompt_erase) {
                 this._state = "ASK_ERASE";
@@ -579,7 +659,7 @@ export class EwtInstallDialog extends LitElement {
         </div>
         <div>
           <ewt-button
-            label="Configure"
+            label=${getTranslation("configure", language)}
             @click=${async () => {
               this._state = "CONFIGURE";
             }}
@@ -587,7 +667,7 @@ export class EwtInstallDialog extends LitElement {
         </div>
         <div>
           <ewt-button
-            label="Logs & Console"
+            label=${getTranslation("logsAndConsole", language)}
             @click=${async () => {
               this._state = "LOGS";
             }}
@@ -1105,22 +1185,18 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderAskErase(): [string | undefined, TemplateResult] {
-    if (!this._manifest) {
-      return ["Loading...", html`<div>Loading manifest...</div>`];
-    }
-
-    const heading = "Erase device";
+    const heading = getTranslation("confirmEraseTitle", language);
     const content = html`
       <div>
-        Do you want to erase the device before installing
-        ${this._manifest.name}? All data on the device will be lost.
+        ${getTranslation("confirmEraseMessage", language)}
+        ${this._manifest.name}? ${getTranslation("confirmEraseWarning", language)}
       </div>
-      <ewt-formfield label="Erase device" class="danger">
+      <ewt-formfield label=${getTranslation("eraseDevice", language)} class="danger">
         <ewt-checkbox></ewt-checkbox>
       </ewt-formfield>
       <ewt-button
         slot="primaryAction"
-        label="Next"
+        label=${getTranslation("next", language)}
         @click=${() => {
           const checkbox = this.shadowRoot!.querySelector("ewt-checkbox")!;
           this._startInstall(checkbox.checked);
@@ -1128,13 +1204,12 @@ export class EwtInstallDialog extends LitElement {
       ></ewt-button>
       <ewt-button
         slot="secondaryAction"
-        label="Back"
+        label=${getTranslation("back", language)}
         @click=${() => {
           this._state = "DASHBOARD";
         }}
       ></ewt-button>
     `;
-
     return [heading, content];
   }
 
@@ -1236,7 +1311,7 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderLogs(): [string | undefined, TemplateResult, boolean] {
-    let heading: string | undefined = `Logs`;
+    let heading: string | undefined = getTranslation("logs", language);
     let content: TemplateResult;
     let hideActions = false;
 
@@ -1244,7 +1319,7 @@ export class EwtInstallDialog extends LitElement {
       <ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>
       <ewt-button
         slot="primaryAction"
-        label="Back"
+        label=${getTranslation("back", language)}
         @click=${async () => {
           const console = this.shadowRoot!.querySelector("ewt-console");
           if (console) {
@@ -1256,7 +1331,7 @@ export class EwtInstallDialog extends LitElement {
       ></ewt-button>
       <ewt-button
         slot="secondaryAction"
-        label="Download Logs"
+        label=${getTranslation("downloadLogsButton", language)}
         @click=${() => {
           const console = this.shadowRoot!.querySelector("ewt-console");
           if (console) {
@@ -1267,7 +1342,7 @@ export class EwtInstallDialog extends LitElement {
       ></ewt-button>
       <ewt-button
         slot="secondaryAction"
-        label="Reset Device"
+        label=${getTranslation("resetDeviceButton", language)}
         @click=${async () => {
           const console = this.shadowRoot!.querySelector("ewt-console");
           if (console) {
