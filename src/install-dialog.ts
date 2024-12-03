@@ -22,7 +22,6 @@ import { sleep } from "./util/sleep";
 import { downloadManifest } from "./util/manifest";
 import { dialogStyles } from "./styles";
 import { version } from "./version";
-import { LineBreakTransformer } from "./util/line-break-transformer";
 
 console.log(
   `ESP Web Tools ${version} by Nabu Casa; https://esphome.github.io/esp-web-tools/`,
@@ -763,41 +762,67 @@ export class EwtInstallDialog extends LitElement {
 
       // Wait for confirmation using pipe pattern
       let configSaved = false;
+      const decoder = new TextDecoder();
+      const reader = this.port.readable.getReader();
+      let accumulatedChunk = ''; // Add this to accumulate chunks
+
       try {
-        await this.port.readable
-          .pipeThrough(new TextDecoderStream())
-          .pipeThrough(new TransformStream(new LineBreakTransformer()))
-          .pipeTo(
-            new WritableStream({
-              write: (chunk) => {
-                if (chunk.includes("[info] Configurations saved successfully")) {
-                  configSaved = true;
-                  // Send restart command
-                  if (this.port?.writable) {
-                    const writer = this.port.writable.getWriter();
-                    try {
-                      const resetCmd = {
-                        jsonrpc: "2.0",
-                        id: "2",
-                        method: "restart",
-                        params: {}
-                      };
-                      const resetEncoder = new TextEncoder();
-                      writer.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
-                    } finally {
-                      writer.releaseLock();
-                    }
-                  }
-                  this._state = "SUCCESS_MESSAGE";
+        // Set a timeout of 5 seconds
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Timeout waiting for configuration confirmation")), 5000);
+        });
+
+        // Read response with timeout
+        const readPromise = (async () => {
+          while (!configSaved) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            console.log("Received:", chunk); // Debug log
+            
+            // Accumulate chunks and check for success message
+            accumulatedChunk += chunk;
+            
+            // Check for various success indicators
+            if (accumulatedChunk.includes("[info] Configurations saved successfully") || 
+                (accumulatedChunk.includes("[info] Saving") && 
+                 accumulatedChunk.includes("[info] JSON-RPC command received: setconfig"))) {
+              configSaved = true;
+              
+              // Send restart command
+              if (this.port?.writable) {
+                const restartWriter = this.port.writable.getWriter();
+                try {
+                  const resetCmd = {
+                    jsonrpc: "2.0",
+                    id: "2",
+                    method: "restart",
+                    params: {}
+                  };
+                  const resetEncoder = new TextEncoder();
+                  await restartWriter.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
+                } finally {
+                  restartWriter.releaseLock();
                 }
-              },
-            })
-          );
+              }
+              
+              this._state = "SUCCESS_MESSAGE";
+              break;
+            }
+          }
+        })();
+
+        await Promise.race([readPromise, timeoutPromise]);
+
       } catch (e) {
         if (!configSaved) {
-          throw new Error("Failed to receive configuration confirmation");
+          throw new Error("Failed to receive configuration confirmation: " + (e as Error).message);
         }
+      } finally {
+        reader.releaseLock();
       }
+
     } catch (e) {
       this._state = "ERROR";
       this._error = `Failed to save configuration: ${(e as Error).message}`;
