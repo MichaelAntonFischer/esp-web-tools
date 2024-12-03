@@ -1105,6 +1105,58 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
+  private async _ensureUnlockedStreams() {
+    try {
+      // First ensure any console is disconnected
+      const existingConsole = this.shadowRoot?.querySelector("ewt-console");
+      if (existingConsole) {
+        await existingConsole.disconnect();
+        await sleep(100);
+      }
+
+      // Force release any locked streams
+      if (this.port.readable?.locked) {
+        try {
+          const reader = this.port.readable.getReader();
+          await reader.cancel();
+          reader.releaseLock();
+        } catch (e) {
+          window.console.log("Error releasing reader:", e);
+        }
+      }
+      if (this.port.writable?.locked) {
+        try {
+          const writer = this.port.writable.getWriter();
+          await writer.close();
+          writer.releaseLock();
+        } catch (e) {
+          window.console.log("Error releasing writer:", e);
+        }
+      }
+
+      // Close and reopen port
+      try {
+        await this.port.close();
+      } catch (e) {
+        window.console.log("Port was already closed");
+      }
+
+      await sleep(500);
+      await this.port.open({ baudRate: 115200 });
+      await sleep(500);
+
+      // Verify streams are unlocked and ready
+      if (this.port.readable?.locked || this.port.writable?.locked) {
+        throw new Error("Streams are still locked after reset");
+      }
+
+      return true;
+    } catch (e) {
+      window.console.error("Error ensuring unlocked streams:", e);
+      return false;
+    }
+  }
+
   private async _saveConfiguration() {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
@@ -1190,39 +1242,15 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      // Ensure any console is disconnected
-      const existingConsole = this.shadowRoot?.querySelector("ewt-console");
-      if (existingConsole) {
-        await existingConsole.disconnect();
+      // Ensure streams are unlocked before proceeding
+      const streamsReady = await this._ensureUnlockedStreams();
+      if (!streamsReady) {
+        throw new Error("Failed to prepare streams for configuration");
       }
 
-      // Close and reopen the port completely
-      try {
-        // Check if port exists and is open
-        if (this.port?.readable || this.port?.writable) {
-          await this.port.close();
-          // Wait a moment after closing
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      } catch (e) {
-        console.log("Port closing error:", e);
-      }
-
-      try {
-        // Only open if it's not already open
-        if (!this.port?.readable && !this.port?.writable) {
-          await this.port?.open({ baudRate: 115200 });
-        }
-        
-        // Wait a moment after opening
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (!this.port || !this.port.readable || !this.port.writable) {
-          throw new Error("Failed to initialize port");
-        }
-      } catch (e) {
-        console.error("Port opening error:", e);
-        throw new Error("Failed to open port: " + (e instanceof Error ? e.message : String(e)));
+      // Verify streams are available
+      if (!this.port?.writable || !this.port?.readable) {
+        throw new Error("Serial port streams are not available");
       }
 
       // Get fresh streams
@@ -1285,13 +1313,13 @@ export class EwtInstallDialog extends LitElement {
           await reader.cancel();
           reader.releaseLock();
         } catch (e) {
-          console.log("Error releasing reader:", e);
+          window.console.log("Error releasing reader:", e);
         }
         try {
           await writer.close();
           writer.releaseLock();
         } catch (e) {
-          console.log("Error releasing writer:", e);
+          window.console.log("Error releasing writer:", e);
         }
       }
 
@@ -1561,7 +1589,7 @@ export class EwtInstallDialog extends LitElement {
             .then(() => this._initializeConsole())
             .catch(e => {
               window.console.error("Error cleaning up console:", e);
-            });
+            }));
         }
       }
 
