@@ -976,7 +976,48 @@ export class EwtInstallDialog extends LitElement {
 
     try {
       if (!this.port || !this.port.writable || !this.port.readable) {
-        throw new Error("Serial port is not properly initialized");
+        // Try to reopen the port if it's closed
+        try {
+          await this.port?.close();
+        } catch (e) {
+          console.log("Port was already closed");
+        }
+        await this.port?.open({ baudRate: 115200 });
+        
+        // If still not readable/writable, throw error
+        if (!this.port || !this.port.writable || !this.port.readable) {
+          throw new Error("Serial port is not properly initialized");
+        }
+      }
+
+      // Ensure any existing readers are released
+      const existingConsole = this.shadowRoot?.querySelector("ewt-console");
+      if (existingConsole) {
+        await existingConsole.disconnect();
+      }
+
+      // Additional cleanup to ensure streams are unlocked
+      try {
+        if (this.port.readable) {
+          const reader = this.port.readable.getReader();
+          await reader.cancel();
+          reader.releaseLock();
+        }
+        if (this.port.writable) {
+          const writer = this.port.writable.getWriter();
+          await writer.close();
+          writer.releaseLock();
+        }
+      } catch (e) {
+        console.log("Stream cleanup error:", e);
+      }
+
+      // Reopen the port after cleanup
+      try {
+        await this.port.close();
+        await this.port.open({ baudRate: 115200 });
+      } catch (e) {
+        console.log("Port reopening error:", e);
       }
 
       // Send configuration
