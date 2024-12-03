@@ -34,8 +34,234 @@ const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 
+const translations = {
+  en: {
+    loading: "Loading...",
+    loadingManifest: "Loading manifest...",
+    deviceDashboard: "Device Dashboard",
+    expertMode: "Expert Mode",
+    selectDevice: "Select Device",
+    createNewDevice: "Create New Device",
+    title: "Title",
+    fiatCurrency: "Fiat Currency",
+    wifiSSID: "WiFi SSID",
+    selectSSID: "--select SSID--",
+    enterManually: "Enter Manually",
+    enterSSIDManually: "Enter SSID manually",
+    wifiPassword: "WiFi Password",
+    saveConfiguration: "Save Configuration",
+    eraseDevice: "Erase device",
+    eraseWarning: "Do you want to erase the device before installing",
+    allDataLost: "All data on the device will be lost.",
+    next: "Next",
+    back: "Back",
+    confirmInstallation: "Confirm Installation",
+    doYouWantToInstall: "Do you want to install",
+    install: "Install",
+    installing: "Installing",
+    preparingInstallation: "Preparing installation",
+    erasing: "Erasing",
+    thisWillTake: "This will take",
+    aMinute: "a minute",
+    twoMinutes: "2 minutes",
+    keepVisible: "Keep this page visible to prevent slow down",
+    installationComplete: "Installation complete!",
+    installationFailed: "Installation failed",
+    logs: "Logs",
+    downloadLogs: "Download Logs",
+    resetDevice: "Reset Device",
+    close: "Close",
+    success: "Success",
+    configSaved: "Configuration saved successfully!",
+    expertModeWarning: "Warning: Expert mode is only for advanced users connecting to non-Opago LNBITS instances. Incorrect settings may cause the device to malfunction. Are you sure you want to continue?",
+    demoModeConfirm: "Are you sure you want to put the device in Demo Mode?",
+    connectionError: "Serial port is not readable/writable. Close any other application using it and try again.",
+    manifestError: "Failed to download manifest",
+  },
+  de: {
+    loading: "Lädt...",
+    loadingManifest: "Lade Manifest...",
+    deviceDashboard: "Geräte-Dashboard",
+    expertMode: "Expertenmodus",
+    selectDevice: "Gerät auswählen",
+    createNewDevice: "Neues Gerät erstellen",
+    title: "Titel",
+    fiatCurrency: "Fiat-Währung",
+    wifiSSID: "WLAN-SSID",
+    selectSSID: "--SSID auswählen--",
+    enterManually: "Manuell eingeben",
+    enterSSIDManually: "SSID manuell eingeben",
+    wifiPassword: "WLAN-Passwort",
+    saveConfiguration: "Konfiguration speichern",
+    eraseDevice: "Gerät löschen",
+    eraseWarning: "Möchten Sie das Gerät vor der Installation löschen",
+    allDataLost: "Alle Daten auf dem Gerät gehen verloren.",
+    next: "Weiter",
+    back: "Zurück",
+    confirmInstallation: "Installation bestätigen",
+    doYouWantToInstall: "Möchten Sie installieren",
+    install: "Installieren",
+    installing: "Installiere",
+    preparingInstallation: "Bereite Installation vor",
+    erasing: "Lösche",
+    thisWillTake: "Dies wird",
+    aMinute: "eine Minute",
+    twoMinutes: "2 Minuten",
+    keepVisible: "Lassen Sie diese Seite sichtbar, um Verlangsamungen zu vermeiden",
+    installationComplete: "Installation abgeschlossen!",
+    installationFailed: "Installation fehlgeschlagen",
+    logs: "Protokolle",
+    downloadLogs: "Protokolle herunterladen",
+    resetDevice: "Gerät zurücksetzen",
+    close: "Schließen",
+    success: "Erfolg",
+    configSaved: "Konfiguration erfolgreich gespeichert!",
+    expertModeWarning: "Warnung: Der Expertenmodus ist nur für fortgeschrittene Benutzer gedacht, die sich mit nicht-Opago LNBITS-Instanzen verbinden. Falsche Einstellungen können zu Fehlfunktionen des Geräts führen. Möchten Sie fortfahren?",
+    demoModeConfirm: "Sind Sie sicher, dass Sie das Gerät in den Demo-Modus versetzen möchten?",
+    connectionError: "Serieller Port ist nicht lesbar/beschreibbar. Schließen Sie alle anderen Anwendungen, die ihn verwenden, und versuchen Sie es erneut.",
+    manifestError: "Manifest konnte nicht heruntergeladen werden",
+  },
+  fr: {
+    loading: "Chargement...",
+    loadingManifest: "Chargement du manifeste...",
+    deviceDashboard: "Tableau de bord",
+    expertMode: "Mode expert",
+    selectDevice: "Sélectionner l'appareil",
+    createNewDevice: "Créer un nouvel appareil",
+    title: "Titre",
+    fiatCurrency: "Devise fiat",
+    wifiSSID: "SSID WiFi",
+    selectSSID: "--sélectionner SSID--",
+    enterManually: "Saisir manuellement",
+    enterSSIDManually: "Saisir le SSID manuellement",
+    wifiPassword: "Mot de passe WiFi",
+    saveConfiguration: "Enregistrer la configuration",
+    eraseDevice: "Effacer l'appareil",
+    eraseWarning: "Voulez-vous effacer l'appareil avant l'installation",
+    allDataLost: "Toutes les données de l'appareil seront perdues.",
+    next: "Suivant",
+    back: "Retour",
+    confirmInstallation: "Confirmer l'installation",
+    doYouWantToInstall: "Voulez-vous installer",
+    install: "Installer",
+    installing: "Installation",
+    preparingInstallation: "Préparation de l'installation",
+    erasing: "Effacement",
+    thisWillTake: "Cela prendra",
+    aMinute: "une minute",
+    twoMinutes: "2 minutes",
+    keepVisible: "Gardez cette page visible pour éviter le ralentissement",
+    installationComplete: "Installation terminée !",
+    installationFailed: "Installation échouée",
+    logs: "Journaux",
+    downloadLogs: "Télécharger les journaux",
+    resetDevice: "Réinitialiser l'appareil",
+    close: "Fermer",
+    success: "Succès",
+    configSaved: "Configuration enregistrée avec succès !",
+    expertModeWarning: "Attention : Le mode expert est réservé aux utilisateurs avancés se connectant à des instances LNBITS non-Opago. Des paramètres incorrects peuvent entraîner un dysfonctionnement de l'appareil. Voulez-vous continuer ?",
+    demoModeConfirm: "Êtes-vous sûr de vouloir mettre l'appareil en mode démo ?",
+    connectionError: "Le port série n'est pas lisible/inscriptible. Fermez toute autre application l'utilisant et réessayez.",
+    manifestError: "Échec du téléchargement du manifeste",
+  },
+  es: {
+    loading: "Cargando...",
+    loadingManifest: "Cargando manifiesto...",
+    deviceDashboard: "Panel del dispositivo",
+    expertMode: "Modo experto",
+    selectDevice: "Seleccionar dispositivo",
+    createNewDevice: "Crear nuevo dispositivo",
+    title: "Título",
+    fiatCurrency: "Moneda fiat",
+    wifiSSID: "SSID WiFi",
+    selectSSID: "--seleccionar SSID--",
+    enterManually: "Introducir manualmente",
+    enterSSIDManually: "Introducir SSID manualmente",
+    wifiPassword: "Contraseña WiFi",
+    saveConfiguration: "Guardar configuración",
+    eraseDevice: "Borrar dispositivo",
+    eraseWarning: "¿Desea borrar el dispositivo antes de instalar",
+    allDataLost: "Se perderán todos los datos del dispositivo.",
+    next: "Siguiente",
+    back: "Atrás",
+    confirmInstallation: "Confirmar instalación",
+    doYouWantToInstall: "¿Desea instalar",
+    install: "Instalar",
+    installing: "Instalando",
+    preparingInstallation: "Preparando instalación",
+    erasing: "Borrando",
+    thisWillTake: "Esto tardará",
+    aMinute: "un minuto",
+    twoMinutes: "2 minutos",
+    keepVisible: "Mantenga esta página visible para evitar ralentizaciones",
+    installationComplete: "¡Instalación completada!",
+    installationFailed: "Instalación fallida",
+    logs: "Registros",
+    downloadLogs: "Descargar registros",
+    resetDevice: "Reiniciar dispositivo",
+    close: "Cerrar",
+    success: "Éxito",
+    configSaved: "¡Configuración guardada con éxito!",
+    expertModeWarning: "Advertencia: El modo experto es solo para usuarios avanzados que se conectan a instancias LNBITS no Opago. La configuración incorrecta puede causar mal funcionamiento del dispositivo. ¿Desea continuar?",
+    demoModeConfirm: "¿Está seguro de que desea poner el dispositivo en modo demo?",
+    connectionError: "El puerto serie no es legible/escribible. Cierre cualquier otra aplicación que lo esté usando e inténtelo de nuevo.",
+    manifestError: "Error al descargar el manifiesto",
+  },
+  it: {
+    loading: "Caricamento...",
+    loadingManifest: "Caricamento manifesto...",
+    deviceDashboard: "Dashboard dispositivo",
+    expertMode: "Modalità esperto",
+    selectDevice: "Seleziona dispositivo",
+    createNewDevice: "Crea nuovo dispositivo",
+    title: "Titolo",
+    fiatCurrency: "Valuta fiat",
+    wifiSSID: "SSID WiFi",
+    selectSSID: "--seleziona SSID--",
+    enterManually: "Inserisci manualmente",
+    enterSSIDManually: "Inserisci SSID manualmente",
+    wifiPassword: "Password WiFi",
+    saveConfiguration: "Salva configurazione",
+    eraseDevice: "Cancella dispositivo",
+    eraseWarning: "Vuoi cancellare il dispositivo prima dell'installazione",
+    allDataLost: "Tutti i dati sul dispositivo andranno persi.",
+    next: "Avanti",
+    back: "Indietro",
+    confirmInstallation: "Conferma installazione",
+    doYouWantToInstall: "Vuoi installare",
+    install: "Installa",
+    installing: "Installazione in corso",
+    preparingInstallation: "Preparazione installazione",
+    erasing: "Cancellazione",
+    thisWillTake: "Ci vorrà",
+    aMinute: "un minuto",
+    twoMinutes: "2 minuti",
+    keepVisible: "Mantieni questa pagina visibile per evitare rallentamenti",
+    installationComplete: "Installazione completata!",
+    installationFailed: "Installazione fallita",
+    logs: "Log",
+    downloadLogs: "Scarica log",
+    resetDevice: "Ripristina dispositivo",
+    close: "Chiudi",
+    success: "Successo",
+    configSaved: "Configurazione salvata con successo!",
+    expertModeWarning: "Attenzione: La modalità esperto è solo per utenti avanzati che si connettono a istanze LNBITS non Opago. Impostazioni errate possono causare malfunzionamenti del dispositivo. Vuoi continuare?",
+    demoModeConfirm: "Sei sicuro di voler mettere il dispositivo in modalità demo?",
+    connectionError: "La porta seriale non è leggibile/scrivibile. Chiudi qualsiasi altra applicazione che la sta utilizzando e riprova.",
+    manifestError: "Impossibile scaricare il manifesto",
+  }
+};
+
+function getTranslation(key: string, language: string = 'en'): string {
+  // Default to English if the language or key doesn't exist
+  return translations[language]?.[key] || translations.en[key] || key;
+}
+
 @customElement('ewt-install-dialog')
 export class EwtInstallDialog extends LitElement {
+  @property({ type: String })
+  language = 'en';  // Default to English
+
   public port!: SerialPort;
 
   public manifestPath!: string;
@@ -322,10 +548,15 @@ export class EwtInstallDialog extends LitElement {
 
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
     if (!this._manifest) {
-      return ["Loading...", html`<div>Loading manifest...</div>`, true, false];
+      return [
+        getTranslation("loading", this.language),
+        html`<div>${getTranslation("loadingManifest", this.language)}</div>`,
+        true,
+        false
+      ];
     }
 
-    const heading = "Device Dashboard";
+    const heading = getTranslation("deviceDashboard", this.language);
     let content: TemplateResult;
     let hideActions = true;
     let allowClosing = true;
@@ -390,7 +621,7 @@ export class EwtInstallDialog extends LitElement {
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
-    let heading: string | undefined = `Configuration`;
+    let heading: string | undefined = getTranslation("deviceDashboard", this.language);
     let content: TemplateResult;
     let hideActions = false;
   
@@ -411,7 +642,7 @@ export class EwtInstallDialog extends LitElement {
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
-        <label>Expert Mode:</label>
+        <label>${getTranslation("expertMode", this.language)}:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="checkbox" id="expertMode" name="expertMode" .checked=${this._expertMode} @change=${this._toggleExpertMode} />
