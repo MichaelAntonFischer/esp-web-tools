@@ -52,7 +52,7 @@ const translations = {
     wifiPassword: "WiFi Password",
     saveConfiguration: "Save Configuration",
     eraseDevice: "Erase device",
-    eraseWarning: "Do you want to erase the device before installing",
+    eraseWarning: "Do you want to erase the device before installing?",
     allDataLost: "All data on the device will be lost.",
     next: "Next",
     back: "Back",
@@ -85,7 +85,7 @@ const translations = {
     downloadLogsButton: "Download Logs",
     resetDeviceButton: "Reset Device",
     confirmEraseTitle: "Erase device",
-    confirmEraseMessage: "Do you want to erase the device before installing",
+    confirmEraseMessage: "Do you want to erase the device before installing?",
     confirmEraseWarning: "All data on the device will be lost.",
     apiKey: "API Key",
     callbackUrl: "Callback URL",
@@ -171,7 +171,7 @@ const translations = {
     downloadLogsButton: "Logs herunterladen",
     resetDeviceButton: "Gerät zurücksetzen",
     confirmEraseTitle: "Gerät löschen",
-    confirmEraseMessage: "Möchten Sie das Gerät vor der Installation löschen",
+    confirmEraseMessage: "Möchten Sie das Gerät vor der Installation löschen?",
     confirmEraseWarning: "Alle Daten auf dem Gerät gehen verloren.",
     apiKey: "API-Schlüssel",
     callbackUrl: "Callback-URL",
@@ -257,7 +257,7 @@ const translations = {
     downloadLogsButton: "Télécharger les journaux",
     resetDeviceButton: "Réinitialiser l'appareil",
     confirmEraseTitle: "Effacer l'appareil",
-    confirmEraseMessage: "Voulez-vous effacer l'appareil avant l'installation",
+    confirmEraseMessage: "Voulez-vous effacer l'appareil avant l'installation?",
     confirmEraseWarning: "Toutes les données de l'appareil seront perdues.",
     apiKey: "Clé API",
     callbackUrl: "URL de callback",
@@ -310,7 +310,7 @@ const translations = {
     wifiPassword: "Contraseña WiFi",
     saveConfiguration: "Guardar configuración",
     eraseDevice: "Borrar dispositivo",
-    eraseWarning: "¿Desea borrar el dispositivo antes de instalar",
+    eraseWarning: "¿Desea borrar el dispositivo antes de instalar?",
     allDataLost: "Se perderán todos los datos del dispositivo.",
     next: "Siguiente",
     back: "Atrás",
@@ -343,7 +343,7 @@ const translations = {
     downloadLogsButton: "Descargar registros",
     resetDeviceButton: "Reiniciar dispositivo",
     confirmEraseTitle: "Borrar dispositivo",
-    confirmEraseMessage: "¿Desea borrar el dispositivo antes de instalar",
+    confirmEraseMessage: "¿Desea borrar el dispositivo antes de instalar?",
     confirmEraseWarning: "Se perderán todos los datos del dispositivo.",
     apiKey: "Clave API",
     callbackUrl: "URL de callback",
@@ -396,7 +396,7 @@ const translations = {
     wifiPassword: "Password WiFi",
     saveConfiguration: "Salva configurazione",
     eraseDevice: "Cancella dispositivo",
-    eraseWarning: "Vuoi cancellare il dispositivo prima dell'installazione",
+    eraseWarning: "Vuoi cancellare il dispositivo prima dell'installazione?",
     allDataLost: "Tutti i dati sul dispositivo andranno persi.",
     next: "Avanti",
     back: "Indietro",
@@ -429,7 +429,7 @@ const translations = {
     downloadLogsButton: "Scarica log",
     resetDeviceButton: "Ripristina dispositivo",
     confirmEraseTitle: "Cancella dispositivo",
-    confirmEraseMessage: "Vuoi cancellare il dispositivo prima dell'installazione",
+    confirmEraseMessage: "Vuoi cancellare il dispositivo prima dell'installazione?",
     confirmEraseWarning: "Tutti i dati sul dispositivo andranno persi.",
     apiKey: "Chiave API",
     callbackUrl: "URL di callback",
@@ -1336,7 +1336,7 @@ export class EwtInstallDialog extends LitElement {
     const content = html`
       <div>
         ${getTranslation("confirmEraseMessage", language)}
-        ${this._manifest.name}? ${getTranslation("confirmEraseWarning", language)}
+        ${this._manifest.name} ${getTranslation("confirmEraseWarning", language)}
       </div>
       <ewt-formfield label=${getTranslation("eraseDevice", language)} class="danger">
         <ewt-checkbox></ewt-checkbox>
@@ -1519,7 +1519,7 @@ export class EwtInstallDialog extends LitElement {
       <ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>
       <ewt-button
         slot="primaryAction"
-        label=${getTranslation("back", language)}
+        label=${getTranslation("close", language)}
         @click=${async () => {
           try {
             // First disconnect console
@@ -1534,12 +1534,19 @@ export class EwtInstallDialog extends LitElement {
             // Ensure clean port state and release any locked streams
             await this._ensureUnlockedStreams();
 
-            this._state = "DASHBOARD";
-            this._initialize();
+            // Close port and installer
+            if (this.port) {
+              try {
+                await this.port.close();
+              } catch (e) {
+                window.console.error("Error closing port:", e);
+              }
+            }
+            this._handleClose();
           } catch (e) {
             window.console.error("Error cleaning up console:", e);
-            this._state = "DASHBOARD";
-            this._initialize();
+            // Even if there's an error, try to close
+            this._handleClose();
           }
         }}
       ></ewt-button>
