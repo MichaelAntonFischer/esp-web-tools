@@ -28,7 +28,7 @@ export class ColoredConsole {
   }
 
   addLine(line: string) {
-    const re = /(?:\033|\\033)(?:\[(.*?)[@-~]|\].*?(?:\007|\033\\))/g;
+    const re = /(?:\x1b|\u001b)(?:\[(.*?)[@-~]|\].*?(?:\x07|\x1b\\))/g;
     let i = 0;
 
     if (this.state.carriageReturn) {
@@ -188,6 +188,22 @@ export class ColoredConsole {
     if (atBottom) {
       this.targetElement.scrollTop = this.targetElement.scrollHeight;
     }
+  }
+
+  public clear() {
+    // Reset the state
+    this.state = {
+      bold: false,
+      italic: false,
+      underline: false,
+      strikethrough: false,
+      foregroundColor: null,
+      backgroundColor: null,
+      carriageReturn: false,
+      secret: false,
+    };
+    // Clear the element content
+    this.targetElement.innerHTML = '';
   }
 }
 

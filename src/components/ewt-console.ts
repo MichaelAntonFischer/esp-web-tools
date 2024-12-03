@@ -9,7 +9,9 @@ export class EwtConsole extends HTMLElement {
   public allowInput = true;
 
   private _console?: ColoredConsole;
-  private _cancelConnection?: () => Promise<void>;
+  private _reader?: ReadableStreamDefaultReader<Uint8Array>;
+  private _writer?: WritableStreamDefaultWriter<Uint8Array>;
+  private _logLines: string[] = [];
 
   public logs(): string {
     return this._console?.logs() || "";
@@ -79,21 +81,14 @@ export class EwtConsole extends HTMLElement {
       });
     }
 
-    const abortController = new AbortController();
-    const connection = this._connect(abortController.signal);
-    this._cancelConnection = () => {
-      abortController.abort();
-      return connection;
-    };
+    this._connect();
   }
 
-  private async _connect(abortSignal: AbortSignal) {
+  private async _connect() {
     this.logger.debug("Starting console read loop");
     try {
       await this.port
-        .readable!.pipeThrough(new TextDecoderStream(), {
-          signal: abortSignal,
-        })
+        .readable!.pipeThrough(new TextDecoderStream())
         .pipeThrough(new TransformStream(new LineBreakTransformer()))
         .pipeTo(
           new WritableStream({
@@ -102,11 +97,9 @@ export class EwtConsole extends HTMLElement {
             },
           }),
         );
-      if (!abortSignal.aborted) {
-        this._console!.addLine("");
-        this._console!.addLine("");
-        this._console!.addLine("Terminal disconnected");
-      }
+      this._console!.addLine("");
+      this._console!.addLine("");
+      this._console!.addLine("Terminal disconnected");
     } catch (e) {
       this._console!.addLine("");
       this._console!.addLine("");
@@ -134,23 +127,63 @@ export class EwtConsole extends HTMLElement {
   }
 
   public async disconnect() {
-    if (this._cancelConnection) {
-      await this._cancelConnection();
-      this._cancelConnection = undefined;
+    if (this._reader) {
+      try {
+        await this._reader.cancel();
+      } finally {
+        this._reader.releaseLock();
+        this._reader = undefined;
+      }
+    }
+    if (this._writer) {
+      try {
+        await this._writer.close();
+      } finally {
+        this._writer.releaseLock();
+        this._writer = undefined;
+      }
     }
   }
 
   public async reset() {
-    this.logger.debug("Triggering reset.");
-    await this.port.setSignals({
-      dataTerminalReady: false,
-      requestToSend: true,
-    });
-    await this.port.setSignals({
-      dataTerminalReady: false,
-      requestToSend: false,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await this.disconnect();
+    this._logLines = [];
+    if (this._console) {
+      this._console.clear();
+    }
+  }
+
+  public async connect() {
+    await this.disconnect();
+    if (!this.port?.readable || !this.port?.writable) {
+      return;
+    }
+
+    try {
+      this._reader = this.port.readable.getReader();
+      this._writer = this.port.writable.getWriter();
+      
+      while (true) {
+        const { value, done } = await this._reader.read();
+        if (done) {
+          break;
+        }
+        this._processChunk(value);
+      }
+    } catch (err) {
+      console.error('Error in serial connection:', err);
+    } finally {
+      await this.disconnect();
+    }
+  }
+
+  private _processChunk(chunk: Uint8Array) {
+    const decoder = new TextDecoder();
+    const line = decoder.decode(chunk);
+    this._logLines.push(line);
+    if (this._console) {
+      this._console.addLine(line);
+    }
   }
 }
 

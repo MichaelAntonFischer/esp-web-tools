@@ -96,7 +96,7 @@ export class EwtInstallDialog extends LitElement {
       this._existingConfigs = await response.json();
     } catch (error) {
       console.error('Error fetching configurations:', error);
-      alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
+      //alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
     }
   }
 
@@ -758,13 +758,40 @@ export class EwtInstallDialog extends LitElement {
         } finally {
           writer.releaseLock();
         }
-      }
 
-      // Output the progress to a console-style window
-      this._state = "LOGS";
-      this.logger.log(`Configuration saved successfully.`);
+        // Read the response
+        if (this.port.readable) {
+          const reader = this.port.readable.getReader();
+          try {
+            let response = '';
+            const decoder = new TextDecoder();
+            
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              
+              response += decoder.decode(value, { stream: true });
+              
+              // Look for complete JSON responses
+              const jsonResponses = this.extractJsonResponses(response);
+              for (const jsonResponse of jsonResponses) {
+                if (jsonResponse.id === "1" && jsonResponse.result === true) {
+                  // Configuration saved successfully
+                  alert('Configuration saved successfully!');
+                  this._state = "DASHBOARD";
+                  return;
+                }
+              }
+            }
+          } catch (error) {
+            throw new Error(`Error reading response: ${error}`);
+          } finally {
+            reader.releaseLock();
+          }
+        }
+      }
     } catch (e) {
-      this.logger.error(`There was an error saving the configuration: ${(e as Error).message}`);
+      alert(`Failed to save configuration: ${(e as Error).message}`);
     } finally {
       this.scanningSSIDs = false;
     }
