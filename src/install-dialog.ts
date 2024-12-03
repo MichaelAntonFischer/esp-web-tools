@@ -1515,7 +1515,6 @@ export class EwtInstallDialog extends LitElement {
     let content: TemplateResult;
     let hideActions = false;
 
-    // Initialize console synchronously first
     content = html`
       <ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>
       <ewt-button
@@ -1532,14 +1531,8 @@ export class EwtInstallDialog extends LitElement {
             // Give time for cleanup
             await sleep(500);
 
-            // Ensure clean port state
-            try {
-              await this.port.close();
-              await sleep(100);
-              await this.port.open({ baudRate: 115200 });
-            } catch (e) {
-              window.console.error("Error resetting port:", e);
-            }
+            // Ensure clean port state and release any locked streams
+            await this._ensureUnlockedStreams();
 
             this._state = "DASHBOARD";
             this._initialize();
@@ -1557,7 +1550,6 @@ export class EwtInstallDialog extends LitElement {
           const console = this.shadowRoot!.querySelector("ewt-console");
           if (console) {
             textDownload(console.logs(), `esp-web-tools-logs.txt`);
-            console.reset();
           }
         }}
       ></ewt-button>
@@ -1568,7 +1560,22 @@ export class EwtInstallDialog extends LitElement {
           const console = this.shadowRoot!.querySelector("ewt-console");
           if (console) {
             try {
-              await console.reset();
+              // Send restart command
+              const resetCmd = {
+                jsonrpc: "2.0",
+                id: "2",
+                method: "restart",
+                params: {}
+              };
+              const writer = this.port.writable?.getWriter();
+              if (writer) {
+                try {
+                  const encoder = new TextEncoder();
+                  await writer.write(encoder.encode(JSON.stringify(resetCmd) + "\n"));
+                } finally {
+                  writer.releaseLock();
+                }
+              }
             } catch (e) {
               window.console.error("Error resetting device:", e);
             }
@@ -1603,7 +1610,8 @@ export class EwtInstallDialog extends LitElement {
         if (console) {
           console.disconnect()
             .then(() => sleep(500))
-            .then(() => this._initializeConsole())
+            .then(() => this._ensureUnlockedStreams())
+            .then(() => sleep(100))
             .catch(e => {
               window.console.error("Error cleaning up console:", e);
             });
