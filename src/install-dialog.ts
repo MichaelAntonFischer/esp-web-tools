@@ -1534,20 +1534,53 @@ export class EwtInstallDialog extends LitElement {
     // Close port. ESPLoader likes opening it.
     this.port.close().then(() => {
       flash(
-        (state) => {
+        async (state) => {
           this._installState = state;
   
           if (state.state === FlashStateType.FINISHED) {
-            sleep(100)
-              .then(() => this.port.open({ baudRate: 115200 }))
-              .then(() => this._initialize(true))
-              .then(() => {
-                this._state = "CONFIGURE";
-                this.requestUpdate();
-              });
+            try {
+              // Wait for device to reset
+              await sleep(1000);
+  
+              // Close any existing connection
+              try {
+                await this.port.close();
+              } catch (e) {
+                console.log("Port was already closed");
+              }
+  
+              // Wait a bit more after closing
+              await sleep(500);
+  
+              // Open fresh connection
+              await this.port.open({ baudRate: 115200 });
+  
+              // Wait for port to be fully ready
+              await sleep(500);
+  
+              // Verify port is properly initialized
+              if (!this.port.readable || !this.port.writable) {
+                throw new Error("Failed to initialize port after installation");
+              }
+  
+              await this._initialize(true);
+              this._state = "CONFIGURE";
+              this.requestUpdate();
+  
+            } catch (e) {
+              console.error("Error setting up port after installation:", e);
+              this._state = "ERROR";
+              this._error = `Failed to initialize port after installation: ${(e instanceof Error ? e.message : String(e))}`;
+            }
           } else if (state.state === FlashStateType.ERROR) {
-            sleep(100)
-              .then(() => this.port.open({ baudRate: 115200 }));
+            try {
+              await sleep(500);
+              await this.port.close();
+              await sleep(500);
+              await this.port.open({ baudRate: 115200 });
+            } catch (e) {
+              console.error("Error recovering from flash error:", e);
+            }
           }
         },
         this.port,
