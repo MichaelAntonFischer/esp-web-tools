@@ -1458,7 +1458,7 @@ export class EwtInstallDialog extends LitElement {
             try {
               await this.port.close();
             } catch (e) {
-              console.log("Port was already closed");
+              window.console.log("Port was already closed");
             }
 
             await sleep(100);
@@ -1471,7 +1471,7 @@ export class EwtInstallDialog extends LitElement {
             this._state = "DASHBOARD";
             this._initialize();
           } catch (e) {
-            console.error("Error cleaning up console:", e);
+            window.console.error("Error cleaning up console:", e);
             // Try to recover
             this._state = "DASHBOARD";
             this._initialize();
@@ -1498,7 +1498,7 @@ export class EwtInstallDialog extends LitElement {
             try {
               await console.reset();
             } catch (e) {
-              console.error("Error resetting device:", e);
+              window.console.error("Error resetting device:", e);
             }
           }
         }}
@@ -1523,7 +1523,7 @@ export class EwtInstallDialog extends LitElement {
             .then(() => sleep(100))
             .then(() => this.port.open({ baudRate: 115200 }))
             .catch(e => {
-              console.error("Error cleaning up console:", e);
+              window.console.error("Error cleaning up console:", e);
             });
         }
       }
