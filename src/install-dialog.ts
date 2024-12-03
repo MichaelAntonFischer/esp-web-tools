@@ -74,7 +74,7 @@ const translations = {
     close: "Close",
     success: "Success",
     configSaved: "Configuration saved successfully!",
-    expertModeWarning: "Warning: Expert mode is only for advanced users connecting to non-Opago LNBITS instances. Incorrect settings may cause the device to malfunction. Are you sure you want to continue?",
+    expertModeWarning: "Warning: Expert mode is only for advanced users connecting to non-OPAGO LNbits instances. Incorrect settings may cause the device to malfunction. Are you sure you want to continue?",
     demoModeConfirm: "Are you sure you want to put the device in Demo Mode?",
     connectionError: "Serial port is not readable/writable. Close any other application using it and try again.",
     manifestError: "Failed to download manifest",
@@ -200,7 +200,7 @@ const translations = {
     selectDevice: "Sélectionner l'appareil",
     createNewDevice: "Créer un nouvel appareil",
     title: "Titre",
-    fiatCurrency: "Devise fiat",
+    fiatCurrency: "Devise",
     wifiSSID: "SSID WiFi",
     selectSSID: "--sélectionner SSID--",
     enterManually: "Saisir manuellement",
@@ -230,7 +230,7 @@ const translations = {
     close: "Fermer",
     success: "Succès",
     configSaved: "Configuration enregistrée avec succès !",
-    expertModeWarning: "Attention : Le mode expert est réservé aux utilisateurs avancés se connectant à des instances LNBITS non-Opago. Des paramètres incorrects peuvent entraîner un dysfonctionnement de l'appareil. Voulez-vous continuer ?",
+    expertModeWarning: "Attention : Le mode expert est réservé aux utilisateurs avancés se connectant à des instances LNbits non-OPAGO. Des paramètres incorrects peuvent entraîner un dysfonctionnement de l'appareil. Voulez-vous continuer ?",
     demoModeConfirm: "Êtes-vous sûr de vouloir mettre l'appareil en mode démo ?",
     connectionError: "Le port série n'est pas lisible/inscriptible. Fermez toute autre application l'utilisant et réessayez.",
     manifestError: "Échec du téléchargement du manifeste",
@@ -245,7 +245,7 @@ const translations = {
     confirmEraseWarning: "Toutes les données de l'appareil seront perdues.",
     apiKey: "Clé API",
     callbackUrl: "URL de callback",
-    fiatPrecision: "Précision Fiat",
+    fiatPrecision: "Précision",
     batteryMaxVolts: "Tension max batterie",
     batteryMinVolts: "Tension min batterie",
     contrastLevel: "Niveau de contraste",
@@ -265,7 +265,7 @@ const translations = {
     enterSSIDHere: "Saisir le SSID manuellement",
     selectSSIDFirst: "--sélectionner SSID--",
     titleLabel: "Titre",
-    fiatCurrencyLabel: "Devise fiat",
+    fiatCurrencyLabel: "Devise",
     wifiPasswordLabel: "Mot de passe WiFi",
     saveConfigurationButton: "Enregistrer la configuration",
     selectConfiguration: "Sélectionner la configuration"
@@ -278,7 +278,7 @@ const translations = {
     selectDevice: "Seleccionar dispositivo",
     createNewDevice: "Crear nuevo dispositivo",
     title: "Título",
-    fiatCurrency: "Moneda fiat",
+    fiatCurrency: "Moneda",
     wifiSSID: "SSID WiFi",
     selectSSID: "--seleccionar SSID--",
     enterManually: "Introducir manualmente",
@@ -308,7 +308,7 @@ const translations = {
     close: "Cerrar",
     success: "Éxito",
     configSaved: "¡Configuración guardada con éxito!",
-    expertModeWarning: "Advertencia: El modo experto es solo para usuarios avanzados que se conectan a instancias LNBITS no Opago. La configuración incorrecta puede causar mal funcionamiento del dispositivo. ¿Desea continuar?",
+    expertModeWarning: "Advertencia: El modo experto es solo para usuarios avanzados que se conectan a instancias LNbits no OPAGO. La configuración incorrecta puede causar mal funcionamiento del dispositivo. ¿Desea continuar?",
     demoModeConfirm: "¿Está seguro de que desea poner el dispositivo en modo demo?",
     connectionError: "El puerto serie no es legible/escribible. Cierre cualquier otra aplicación que lo esté usando e inténtelo de nuevo.",
     manifestError: "Error al descargar el manifiesto",
@@ -323,7 +323,7 @@ const translations = {
     confirmEraseWarning: "Se perderán todos los datos del dispositivo.",
     apiKey: "Clave API",
     callbackUrl: "URL de callback",
-    fiatPrecision: "Precisión Fiat",
+    fiatPrecision: "Precisión",
     batteryMaxVolts: "Voltaje máx. batería",
     batteryMinVolts: "Voltaje mín. batería",
     contrastLevel: "Nivel de contraste",
@@ -343,7 +343,7 @@ const translations = {
     enterSSIDHere: "Introducir SSID manualmente",
     selectSSIDFirst: "--seleccionar SSID--",
     titleLabel: "Título",
-    fiatCurrencyLabel: "Moneda fiat",
+    fiatCurrencyLabel: "Moneda",
     wifiPasswordLabel: "Contraseña WiFi",
     saveConfigurationButton: "Guardar configuración",
     selectConfiguration: "Seleccionar configuración"
@@ -356,7 +356,7 @@ const translations = {
     selectDevice: "Seleziona dispositivo",
     createNewDevice: "Crea nuovo dispositivo",
     title: "Titolo",
-    fiatCurrency: "Valuta fiat",
+    fiatCurrency: "Valuta",
     wifiSSID: "SSID WiFi",
     selectSSID: "--seleziona SSID--",
     enterManually: "Inserisci manualmente",
@@ -386,7 +386,7 @@ const translations = {
     close: "Chiudi",
     success: "Successo",
     configSaved: "Configurazione salvata con successo!",
-    expertModeWarning: "Attenzione: La modalità esperto è solo per utenti avanzati che si connettono a istanze LNBITS non Opago. Impostazioni errate possono causare malfunzionamenti del dispositivo. Vuoi continuare?",
+    expertModeWarning: "Attenzione: La modalità esperto è solo per utenti avanzati che si connettono a istanze LNbits non OPAGO. Impostazioni errate possono causare malfunzionamenti del dispositivo. Vuoi continuare?",
     demoModeConfirm: "Sei sicuro di voler mettere il dispositivo in modalità demo?",
     connectionError: "La porta seriale non è leggibile/scrivibile. Chiudi qualsiasi altra applicazione che la sta utilizzando e riprova.",
     manifestError: "Impossibile scaricare il manifesto",
@@ -401,7 +401,7 @@ const translations = {
     confirmEraseWarning: "Tutti i dati sul dispositivo andranno persi.",
     apiKey: "Chiave API",
     callbackUrl: "URL di callback",
-    fiatPrecision: "Precisione Fiat",
+    fiatPrecision: "Precisione",
     batteryMaxVolts: "Tensione max batteria",
     batteryMinVolts: "Tensione min batteria",
     contrastLevel: "Livello contrasto",
@@ -421,7 +421,7 @@ const translations = {
     enterSSIDHere: "Inserisci SSID manualmente",
     selectSSIDFirst: "--seleziona SSID--",
     titleLabel: "Titolo",
-    fiatCurrencyLabel: "Valuta fiat",
+    fiatCurrencyLabel: "Valuta",
     wifiPasswordLabel: "Password WiFi",
     saveConfigurationButton: "Salva configurazione",
     selectConfiguration: "Seleziona configurazione"
@@ -1016,7 +1016,7 @@ export class EwtInstallDialog extends LitElement {
     
     if (checkbox.checked) {
       // Show warning before enabling expert mode
-      if (confirm('Warning: Expert mode is only for advanced users connecting to non-Opago LNBITS instances. Incorrect settings may cause the device to malfunction. Are you sure you want to continue?')) {
+      if (confirm('Warning: Expert mode is only for advanced users connecting to non-OPAGO LNbits instances. Incorrect settings may cause the device to malfunction. Are you sure you want to continue?')) {
         this._expertMode = true;
       } else {
         checkbox.checked = false;
@@ -1660,17 +1660,16 @@ export class EwtInstallDialog extends LitElement {
     ];
 
   private _renderSuccessMessage(): [string, TemplateResult, boolean] {
-    const heading = "Success";
+    const heading = getTranslation("success", language);
     const content = html`
       <ewt-page-message
         .icon=${"🎉"}
-        label="Configuration saved successfully!"
+        label=${getTranslation("configSaved", language)}
       ></ewt-page-message>
       <ewt-button
         slot="primaryAction"
-        label="Close"
+        label=${getTranslation("close", language)}
         @click=${async () => {
-          // Close the port
           if (this.port) {
             try {
               await this.port.close();
@@ -1678,7 +1677,6 @@ export class EwtInstallDialog extends LitElement {
               console.error("Error closing port:", e);
             }
           }
-          // Close the dialog and remove it
           this._handleClose();
         }}
       ></ewt-button>
