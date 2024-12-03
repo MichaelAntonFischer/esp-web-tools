@@ -604,8 +604,58 @@ export class EwtInstallDialog extends LitElement {
 
   private _toggleExpertMode(event: Event) {
     const checkbox = event.target as HTMLInputElement;
-    this._expertMode = checkbox.checked;
-    this.requestUpdate(); // This triggers a re-render
+    
+    if (checkbox.checked) {
+      // Show warning before enabling expert mode
+      if (confirm('Warning: Expert mode is only for advanced users connecting to non-Opago LNBITS instances. Incorrect settings may cause the device to malfunction. Are you sure you want to continue?')) {
+        this._expertMode = true;
+      } else {
+        checkbox.checked = false;
+        return;
+      }
+    } else {
+      this._expertMode = false;
+      // Reset fields when disabling expert mode
+      this._resetConfigurationFields();
+    }
+    
+    this.requestUpdate();
+  }
+
+  private _resetConfigurationFields() {
+    // Get all the relevant elements
+    const titleInput = this.shadowRoot?.querySelector('#titleInput') as HTMLInputElement;
+    const titleLabel = this.shadowRoot?.querySelector('#titleLabel') as HTMLDivElement;
+    const currencySelect = this.shadowRoot?.querySelector('#fiatCurrency') as HTMLSelectElement;
+    const currencyLabel = this.shadowRoot?.querySelector('#currencyLabel') as HTMLDivElement;
+    const configSelect = this.shadowRoot?.querySelector('select[name="existingConfigs"]') as HTMLSelectElement;
+
+    if (titleInput && titleLabel && currencySelect && currencyLabel && configSelect) {
+      // Reset the device selector to "Create New Device"
+      configSelect.value = 'createNewDevice';
+      
+      // Trigger the change event to properly update the UI
+      const event = new Event('change');
+      configSelect.dispatchEvent(event);
+      
+      // Show title and currency fields for new device
+      titleInput.style.display = 'block';
+      titleLabel.style.display = 'block';
+      currencySelect.style.display = 'block';
+      currencyLabel.style.display = 'block';
+      
+      // Clear any values
+      titleInput.value = '';
+      currencySelect.value = 'EUR'; // Reset to default currency
+
+      // Reset any expert mode specific fields
+      if (this.shadowRoot) {
+        const apiKeyInput = this.shadowRoot.querySelector('input[name="apiKey.key"]') as HTMLInputElement;
+        const callbackUrlInput = this.shadowRoot.querySelector('input[name="callbackUrl"]') as HTMLInputElement;
+        if (apiKeyInput) apiKeyInput.value = '';
+        if (callbackUrlInput) callbackUrlInput.value = '';
+      }
+    }
   }
 
   private async _saveConfiguration() {
