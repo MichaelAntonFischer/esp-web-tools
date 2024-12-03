@@ -660,28 +660,6 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _saveConfiguration() {
-    // First, ensure any existing readers/writers are cleaned up
-    try {
-      if (this.port?.readable) {
-        const reader = this.port.readable.getReader();
-        try {
-          await reader.cancel();
-        } finally {
-          reader.releaseLock();
-        }
-      }
-      if (this.port?.writable) {
-        const writer = this.port.writable.getWriter();
-        try {
-          await writer.close();
-        } finally {
-          writer.releaseLock();
-        }
-      }
-    } catch (e) {
-      console.error("Error cleaning up existing streams:", e);
-    }
-
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
@@ -771,57 +749,51 @@ export class EwtInstallDialog extends LitElement {
         await this.port.open({ baudRate: 115200 });
       }
 
-      // Write configuration and read response
-      if (this.port.readable && this.port.writable) {
-        const reader = this.port.readable.getReader();
-        try {
-          // Write configuration
-          const writer = this.port.writable.getWriter();
-          try {
-            const encoder = new TextEncoder();
-            const dataStr = JSON.stringify(data);
-            window.console.log("Sending:", dataStr);
-            const encodedData = encoder.encode(dataStr + "\n");
-            await writer.write(encodedData);
-          } finally {
-            writer.releaseLock();
-          }
+      // Send configuration
+      const writer = this.port.writable.getWriter();
+      try {
+        const encoder = new TextEncoder();
+        const dataStr = JSON.stringify(data);
+        window.console.log("Sending:", dataStr);
+        const encodedData = encoder.encode(dataStr + "\n");
+        await writer.write(encodedData);
+      } finally {
+        writer.releaseLock();
+      }
 
-          // Read and wait for confirmation
-          let response = '';
-          const decoder = new TextDecoder();
-          let timeout = 5000; // 5 second timeout
-          const startTime = Date.now();
-          
-          while (Date.now() - startTime < timeout) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            
-            response += decoder.decode(value, { stream: true });
-            
-            if (response.includes("[info] Configurations saved successfully")) {
-              // Send reset command
-              const writer = this.port.writable.getWriter();
-              try {
-                const resetCmd = {
-                  jsonrpc: "2.0",
-                  id: "2",
-                  method: "restart",  // Use restart instead of reset
-                  params: {}
-                };
-                const resetEncoder = new TextEncoder();  // Create new encoder for reset command
-                await writer.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
-              } finally {
-                writer.releaseLock();
-              }
-              
-              this._state = "SUCCESS_MESSAGE";
-              return;
-            }
-          }
-          throw new Error("Timeout waiting for configuration save confirmation");
-        } finally {
-          reader.releaseLock();
+      // Wait for confirmation using pipe pattern
+      let configSaved = false;
+      try {
+        await this.port.readable
+          .pipeThrough(new TextDecoderStream())
+          .pipeThrough(new TransformStream(new LineBreakTransformer()))
+          .pipeTo(
+            new WritableStream({
+              write: (chunk) => {
+                if (chunk.includes("[info] Configurations saved successfully")) {
+                  configSaved = true;
+                  // Send restart command
+                  const writer = this.port.writable!.getWriter();
+                  try {
+                    const resetCmd = {
+                      jsonrpc: "2.0",
+                      id: "2",
+                      method: "restart",
+                      params: {}
+                    };
+                    const resetEncoder = new TextEncoder();
+                    writer.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
+                  } finally {
+                    writer.releaseLock();
+                  }
+                  this._state = "SUCCESS_MESSAGE";
+                }
+              },
+            })
+          );
+      } catch (e) {
+        if (!configSaved) {
+          throw new Error("Failed to receive configuration confirmation");
         }
       }
     } catch (e) {
