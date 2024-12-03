@@ -22,6 +22,7 @@ import { sleep } from "./util/sleep";
 import { downloadManifest } from "./util/manifest";
 import { dialogStyles } from "./styles";
 import { version } from "./version";
+import { LineBreakTransformer } from "./util/line-break-transformer";
 
 console.log(
   `ESP Web Tools ${version} by Nabu Casa; https://esphome.github.io/esp-web-tools/`,
@@ -744,9 +745,8 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      if (!this.port || this.port.readable === null || this.port.writable === null) {
-        this.port = await navigator.serial.requestPort();
-        await this.port.open({ baudRate: 115200 });
+      if (!this.port || !this.port.writable || !this.port.readable) {
+        throw new Error("Serial port is not properly initialized");
       }
 
       // Send configuration
@@ -773,18 +773,20 @@ export class EwtInstallDialog extends LitElement {
                 if (chunk.includes("[info] Configurations saved successfully")) {
                   configSaved = true;
                   // Send restart command
-                  const writer = this.port.writable!.getWriter();
-                  try {
-                    const resetCmd = {
-                      jsonrpc: "2.0",
-                      id: "2",
-                      method: "restart",
-                      params: {}
-                    };
-                    const resetEncoder = new TextEncoder();
-                    writer.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
-                  } finally {
-                    writer.releaseLock();
+                  if (this.port?.writable) {
+                    const writer = this.port.writable.getWriter();
+                    try {
+                      const resetCmd = {
+                        jsonrpc: "2.0",
+                        id: "2",
+                        method: "restart",
+                        params: {}
+                      };
+                      const resetEncoder = new TextEncoder();
+                      writer.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
+                    } finally {
+                      writer.releaseLock();
+                    }
                   }
                   this._state = "SUCCESS_MESSAGE";
                 }
