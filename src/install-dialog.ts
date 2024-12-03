@@ -93,7 +93,18 @@ const translations = {
     batteryMaxVolts: "Battery Max Volts",
     batteryMinVolts: "Battery Min Volts",
     contrastLevel: "Contrast Level",
-    logLevel: "Log Level"
+    logLevel: "Log Level",
+    confirmInstallationTitle: "Confirm Installation",
+    doYouWantToInstallVersion: "Do you want to install {name} {version}?",
+    installingTitle: "Installing",
+    preparingInstallation: "Preparing installation",
+    installingProgress: "Installing",
+    installationTimeMinute: "This will take a minute",
+    installationTime2Minutes: "This will take 2 minutes",
+    keepPageVisible: "Keep this page visible to prevent slow down",
+    installationComplete: "Installation complete!",
+    installationFailed: "Installation failed",
+    manifestNotLoaded: "Manifest not loaded"
   },
   de: {
     loading: "Lädt...",
@@ -152,7 +163,18 @@ const translations = {
     batteryMaxVolts: "Batterie Max Volt",
     batteryMinVolts: "Batterie Min Volt",
     contrastLevel: "Kontraststufe",
-    logLevel: "Log-Level"
+    logLevel: "Log-Level",
+    confirmInstallationTitle: "Installation bestätigen",
+    doYouWantToInstallVersion: "Möchten Sie {name} {version} installieren?",
+    installingTitle: "Installiere",
+    preparingInstallation: "Bereite Installation vor",
+    installingProgress: "Installiere",
+    installationTimeMinute: "Dies wird eine Minute dauern",
+    installationTime2Minutes: "Dies wird 2 Minuten dauern",
+    keepPageVisible: "Lassen Sie diese Seite sichtbar, um Verlangsamungen zu vermeiden",
+    installationComplete: "Installation abgeschlossen!",
+    installationFailed: "Installation fehlgeschlagen",
+    manifestNotLoaded: "Manifest nicht geladen"
   },
   fr: {
     loading: "Chargement...",
@@ -211,7 +233,18 @@ const translations = {
     batteryMaxVolts: "Tension max batterie",
     batteryMinVolts: "Tension min batterie",
     contrastLevel: "Niveau de contraste",
-    logLevel: "Niveau de log"
+    logLevel: "Niveau de log",
+    confirmInstallationTitle: "Confirmer l'installation",
+    doYouWantToInstallVersion: "Voulez-vous installer {name} {version} ?",
+    installingTitle: "Installation en cours",
+    preparingInstallation: "Préparation de l'installation",
+    installingProgress: "Installation en cours",
+    installationTimeMinute: "Cela prendra une minute",
+    installationTime2Minutes: "Cela prendra 2 minutes",
+    keepPageVisible: "Gardez cette page visible pour éviter le ralentissement",
+    installationComplete: "Installation terminée !",
+    installationFailed: "Installation échouée",
+    manifestNotLoaded: "Manifeste non chargé"
   },
   es: {
     loading: "Cargando...",
@@ -270,7 +303,18 @@ const translations = {
     batteryMaxVolts: "Voltaje máx. batería",
     batteryMinVolts: "Voltaje mín. batería",
     contrastLevel: "Nivel de contraste",
-    logLevel: "Nivel de registro"
+    logLevel: "Nivel de registro",
+    confirmInstallationTitle: "Confirmar instalación",
+    doYouWantToInstallVersion: "¿Desea instalar {name} {version}?",
+    installingTitle: "Instalando",
+    preparingInstallation: "Preparando instalación",
+    installingProgress: "Instalando",
+    installationTimeMinute: "Esto tardará un minuto",
+    installationTime2Minutes: "Esto tardará 2 minutos",
+    keepPageVisible: "Mantenga esta página visible para evitar ralentizaciones",
+    installationComplete: "¡Instalación completada!",
+    installationFailed: "Instalación fallida",
+    manifestNotLoaded: "Manifiesto no cargado"
   },
   it: {
     loading: "Caricamento...",
@@ -329,7 +373,18 @@ const translations = {
     batteryMaxVolts: "Tensione max batteria",
     batteryMinVolts: "Tensione min batteria",
     contrastLevel: "Livello contrasto",
-    logLevel: "Livello log"
+    logLevel: "Livello log",
+    confirmInstallationTitle: "Conferma installazione",
+    doYouWantToInstallVersion: "Vuoi installare {name} {version}?",
+    installingTitle: "Installazione in corso",
+    preparingInstallation: "Preparazione installazione",
+    installingProgress: "Installazione in corso",
+    installationTimeMinute: "Ci vorrà un minuto",
+    installationTime2Minutes: "Ci vorranno 2 minuti",
+    keepPageVisible: "Mantieni questa pagina visibile per evitare rallentamenti",
+    installationComplete: "Installazione completata!",
+    installationFailed: "Installazione fallita",
+    manifestNotLoaded: "Manifesto non caricato"
   }
 };
 
@@ -1409,7 +1464,7 @@ export class EwtInstallDialog extends LitElement {
   private _confirmInstall() {
     if (!this._manifest) {
       this._state = "ERROR";
-      this._error = "Manifest not loaded";
+      this._error = getTranslation("manifestNotLoaded", language);
       return;
     }
 
@@ -1424,16 +1479,14 @@ export class EwtInstallDialog extends LitElement {
   
           if (state.state === FlashStateType.FINISHED) {
             sleep(100)
-              // Flashing closes the port
               .then(() => this.port.open({ baudRate: 115200 }))
               .then(() => this._initialize(true))
               .then(() => {
-                this._state = "CONFIGURE"; // Change state to CONFIGURE after installation
+                this._state = "CONFIGURE";
                 this.requestUpdate();
               });
           } else if (state.state === FlashStateType.ERROR) {
             sleep(100)
-              // Flashing closes the port
               .then(() => this.port.open({ baudRate: 115200 }));
           }
         },
@@ -1443,7 +1496,6 @@ export class EwtInstallDialog extends LitElement {
         this._installErase,
       );
     });
-    // YOLO2
   }
 
   private async _handleClose() {
