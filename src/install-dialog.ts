@@ -104,7 +104,11 @@ const translations = {
     keepPageVisible: "Keep this page visible to prevent slow down",
     installationComplete: "Installation complete!",
     installationFailed: "Installation failed",
-    manifestNotLoaded: "Manifest not loaded"
+    manifestNotLoaded: "Manifest not loaded",
+    selectExistingDevice: "Select Device",
+    createNewDeviceOption: "Create New Device",
+    demoModeConfirmation: "Are you sure you want to put the device in Demo Mode?",
+    connectionFailed: "Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com",
   },
   de: {
     loading: "Lädt...",
@@ -174,7 +178,11 @@ const translations = {
     keepPageVisible: "Lassen Sie diese Seite sichtbar, um Verlangsamungen zu vermeiden",
     installationComplete: "Installation abgeschlossen!",
     installationFailed: "Installation fehlgeschlagen",
-    manifestNotLoaded: "Manifest nicht geladen"
+    manifestNotLoaded: "Manifest nicht geladen",
+    selectExistingDevice: "Gerät auswählen",
+    createNewDeviceOption: "Neues Gerät erstellen",
+    demoModeConfirmation: "Sind Sie sicher, dass Sie das Gerät in den Demo-Modus versetzen möchten?",
+    connectionFailed: "API-Schlüssel konnten nicht abgerufen werden: Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut. Wenn das Problem weiterhin besteht, kontaktieren Sie support@opago-pay.com",
   },
   fr: {
     loading: "Chargement...",
@@ -244,7 +252,11 @@ const translations = {
     keepPageVisible: "Gardez cette page visible pour éviter le ralentissement",
     installationComplete: "Installation terminée !",
     installationFailed: "Installation échouée",
-    manifestNotLoaded: "Manifeste non chargé"
+    manifestNotLoaded: "Manifeste non chargé",
+    selectExistingDevice: "Sélectionner l'appareil",
+    createNewDeviceOption: "Créer un nouvel appareil",
+    demoModeConfirmation: "Êtes-vous sûr de vouloir mettre l'appareil en mode démo ?",
+    connectionFailed: "Échec de la récupération des clés API : Veuillez vérifier votre connexion Internet et réessayer. Si le problème persiste, contactez support@opago-pay.com",
   },
   es: {
     loading: "Cargando...",
@@ -314,7 +326,11 @@ const translations = {
     keepPageVisible: "Mantenga esta página visible para evitar ralentizaciones",
     installationComplete: "¡Instalación completada!",
     installationFailed: "Instalación fallida",
-    manifestNotLoaded: "Manifiesto no cargado"
+    manifestNotLoaded: "Manifiesto no cargado",
+    selectExistingDevice: "Seleccionar dispositivo",
+    createNewDeviceOption: "Crear nuevo dispositivo",
+    demoModeConfirmation: "¿Está seguro de que desea poner el dispositivo en modo demo?",
+    connectionFailed: "Error al obtener las claves API: Por favor, compruebe su conexión a Internet e inténtelo de nuevo. Si el problema persiste, contacte con support@opago-pay.com",
   },
   it: {
     loading: "Caricamento...",
@@ -384,7 +400,11 @@ const translations = {
     keepPageVisible: "Mantieni questa pagina visibile per evitare rallentamenti",
     installationComplete: "Installazione completata!",
     installationFailed: "Installazione fallita",
-    manifestNotLoaded: "Manifesto non caricato"
+    manifestNotLoaded: "Manifesto non caricato",
+    selectExistingDevice: "Seleziona dispositivo",
+    createNewDeviceOption: "Crea nuovo dispositivo",
+    demoModeConfirmation: "Sei sicuro di voler mettere il dispositivo in modalità demo?",
+    connectionFailed: "Impossibile recuperare le chiavi API: Verifica la tua connessione Internet e riprova. Se il problema persiste, contatta support@opago-pay.com",
   }
 };
 
@@ -843,7 +863,7 @@ export class EwtInstallDialog extends LitElement {
             ${this._existingConfigs.map(config => html`
               <option value="${config.id}">${config.title}</option>
             `)}
-            <option value="createNewDevice" selected>Create New Device</option>
+            <option value="createNewDevice" selected>${getTranslation("createNewDeviceOption", language)}</option>
           </select>
         </div>
         <div style="grid-column: 1;" id="titleLabel" style="display: none;">
@@ -1104,7 +1124,7 @@ export class EwtInstallDialog extends LitElement {
       }
       
       if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
-        if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
+        if (!confirm(getTranslation("demoModeConfirmation", language))) {
           return;
         }
       }
@@ -1255,7 +1275,12 @@ export class EwtInstallDialog extends LitElement {
 
   _renderInstall(): [string | undefined, TemplateResult, boolean, boolean] {
     if (!this._manifest) {
-      return ["Loading...", html`<div>Loading manifest...</div>`, true, false];
+      return [
+        getTranslation("loading", language),
+        html`<div>${getTranslation("loadingManifest", language)}</div>`,
+        true,
+        false
+      ];
     }
 
     let heading: string | undefined;
@@ -1264,20 +1289,22 @@ export class EwtInstallDialog extends LitElement {
     const allowClosing = false;
   
     if (!this._installConfirmed) {
-      heading = "Confirm Installation";
+      heading = getTranslation("confirmInstallationTitle", language);
       content = html`
-        Do you want to install ${this._manifest.name}&nbsp;${this._manifest.version}?
+        ${getTranslation("doYouWantToInstallVersion", language)
+          .replace("{name}", this._manifest.name)
+          .replace("{version}", this._manifest.version)}
         ${this._installErase
-          ? html`<br /><br />All data on the device will be erased.`
+          ? html`<br /><br />${getTranslation("confirmEraseWarning", language)}`
           : ""}
         <ewt-button
           slot="primaryAction"
-          label="Install"
+          label=${getTranslation("install", language)}
           @click=${this._confirmInstall}
         ></ewt-button>
         <ewt-button
           slot="secondaryAction"
-          label="Back"
+          label=${getTranslation("back", language)}
           @click=${() => {
             this._state = "DASHBOARD";
           }}
@@ -1288,28 +1315,25 @@ export class EwtInstallDialog extends LitElement {
       this._installState.state === FlashStateType.INITIALIZING ||
       this._installState.state === FlashStateType.PREPARING
     ) {
-      heading = "Installing";
-      content = this._renderProgress("Preparing installation");
+      heading = getTranslation("installingTitle", language);
+      content = this._renderProgress(getTranslation("preparingInstallation", language));
       hideActions = true;
     } else if (this._installState.state === FlashStateType.ERASING) {
-      heading = "Installing";
-      content = this._renderProgress("Erasing");
+      heading = getTranslation("installingTitle", language);
+      content = this._renderProgress(getTranslation("erasing", language));
       hideActions = true;
     } else if (this._installState.state === FlashStateType.WRITING) {
-      heading = "Installing";
+      heading = getTranslation("installingTitle", language);
       let percentage: number | undefined;
       if (this._installState.details.percentage < 4) {
-        content = this._renderProgress("Installing");
+        content = this._renderProgress(getTranslation("installingProgress", language));
       } else {
         percentage = this._installState.details.percentage;
         content = this._renderProgress(
           html`
-            Installing<br />
-            This will take
-            ${this._installState.chipFamily === "ESP8266"
-              ? "a minute"
-              : "2 minutes"}.<br />
-            Keep this page visible to prevent slow down
+            ${getTranslation("installingProgress", language)}<br />
+            ${getTranslation(this._installState.chipFamily === "ESP8266" ? "installationTimeMinute" : "installationTime2Minutes", language)}<br />
+            ${getTranslation("keepPageVisible", language)}
           `,
           percentage,
         );
@@ -1320,18 +1344,18 @@ export class EwtInstallDialog extends LitElement {
       content = html`
         <ewt-page-message
           .icon=${OK_ICON}
-          label="Installation complete!"
+          label=${getTranslation("installationComplete", language)}
         ></ewt-page-message>
         <ewt-button
           slot="primaryAction"
-          label="Next"
+          label=${getTranslation("next", language)}
           @click=${() => {
             this._state = "DASHBOARD";
           }}
         ></ewt-button>
       `;
     } else if (this._installState.state === FlashStateType.ERROR) {
-      heading = "Installation failed";
+      heading = getTranslation("installationFailed", language);
       content = html`
         <ewt-page-message
           .icon=${ERROR_ICON}
@@ -1339,7 +1363,7 @@ export class EwtInstallDialog extends LitElement {
         ></ewt-page-message>
         <ewt-button
           slot="primaryAction"
-          label="Back"
+          label=${getTranslation("back", language)}
           @click=${async () => {
             this._initialize();
             this._state = "DASHBOARD";
