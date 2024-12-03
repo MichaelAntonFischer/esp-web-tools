@@ -199,8 +199,7 @@ export class EwtInstallDialog extends LitElement {
     }
 
     const isManualEntrySelected = target.value === "manual";
-    const manualInputId = target.id === "wifiSSID" ? "manualSSID" : "manualSSID2";
-    const manualInput = this.shadowRoot?.querySelector(`#${manualInputId}`) as HTMLInputElement | null;
+    const manualInput = this.shadowRoot?.querySelector('#manualSSID') as HTMLInputElement | null;
 
     if (isManualEntrySelected) {
       if (manualInput) {
@@ -497,23 +496,6 @@ export class EwtInstallDialog extends LitElement {
     <div style="grid-column: 3;">
       <input type="text" name="wifiPwd" value="" />
     </div>
-    <div style="grid-column: 1;">
-      <label>WiFi SSID2:</label>
-    </div>
-    <div style="grid-column: 3;">
-      <select id="wifiSSID2" name="wifiSSID2" @click=${this._handleSSIDClick}>
-        <option value="">--select SSID--</option>
-        ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-        <option value="manual">Enter Manually</option>
-      </select>
-      <input type="text" id="manualSSID2" name="manualSSID2" style="display:none;" placeholder="Enter SSID manually">
-    </div>
-    <div style="grid-column: 1;">
-      <label>WiFi Password 2:</label>
-    </div>
-    <div style="grid-column: 3;">
-        <input type="text" name="wifiPwd2" value="" />
-    </div>
     </form>
     <ewt-button
       slot="primaryAction"
@@ -626,13 +608,9 @@ export class EwtInstallDialog extends LitElement {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
-    // Set scanningSSIDs to true after the form has been submitted
     this.scanningSSIDs = true;
 
-    // Create a new FormData instance
     let formData = new FormData(form);
-  
-    // Convert formData to an object
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
 
@@ -641,13 +619,8 @@ export class EwtInstallDialog extends LitElement {
       object.wifiSSID = object.manualSSID;
     }
 
-    if (object.wifiSSID2 === 'manual' && object.manualSSID2) {
-      object.wifiSSID2 = object.manualSSID2;
-    }
-
     delete object.expertMode;
     delete object.manualSSID;
-    delete object.manualSSID2;
   
     // If expert mode is enabled, write the data to json exactly as entered by the user
     if (this._expertMode) {
