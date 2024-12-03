@@ -33,6 +33,7 @@ const OK_ICON = "🎉";
 const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago-pay.com' : 'api.opago-pay.com';
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
+const language = document.body.dataset.language || 'en';
 
 const translations = {
   en: {
@@ -549,14 +550,14 @@ export class EwtInstallDialog extends LitElement {
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
     if (!this._manifest) {
       return [
-        getTranslation("loading", "{{ user.language }}"),
-        html`<div>${getTranslation("loadingManifest", "{{ user.language }}")}</div>`,
+        getTranslation("loading", language),
+        html`<div>${getTranslation("loadingManifest", language)}</div>`,
         true,
         false
       ];
     }
 
-    const heading = getTranslation("deviceDashboard", "{{ user.language }}");
+    const heading = getTranslation("deviceDashboard", language);
     let content: TemplateResult;
     let hideActions = true;
     let allowClosing = true;
@@ -621,7 +622,7 @@ export class EwtInstallDialog extends LitElement {
 
   private _renderConfigure(): [string | undefined, TemplateResult, boolean] {
     this._fetchConfigs();
-    let heading: string | undefined = getTranslation("deviceDashboard", "{{ user.language }}");
+    let heading: string | undefined = getTranslation("deviceDashboard", language);
     let content: TemplateResult;
     let hideActions = false;
   
@@ -642,7 +643,7 @@ export class EwtInstallDialog extends LitElement {
     content = html`
     <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
       <div style="grid-column: 1;">
-        <label>${getTranslation("expertMode", "{{ user.language }}")}:</label>
+        <label>${getTranslation("expertMode", language)}:</label>
       </div>
       <div style="grid-column: 3;">
         <input type="checkbox" id="expertMode" name="expertMode" .checked=${this._expertMode} @change=${this._toggleExpertMode} />
