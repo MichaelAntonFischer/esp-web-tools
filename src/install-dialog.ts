@@ -112,7 +112,15 @@ const translations = {
     fiatCurrencyLabel: "Currency",
     wifiPasswordLabel: "WiFi Password",
     saveConfigurationButton: "Save Configuration",
-    selectConfiguration: "Select Configuration"
+    selectConfiguration: "Select Configuration",
+    apiKeyLabel: "API Key",
+    callbackUrlLabel: "Callback URL",
+    fiatPrecisionLabel: "Precision",
+    batteryMaxVoltsLabel: "Battery Max Volts",
+    batteryMinVoltsLabel: "Battery Min Volts",
+    contrastLevelLabel: "Contrast Level",
+    logLevelLabel: "Log Level",
+    currencyLabel: "Currency"
   },
   de: {
     loading: "Lädt...",
@@ -190,7 +198,15 @@ const translations = {
     fiatCurrencyLabel: "Währung",
     wifiPasswordLabel: "WLAN-Passwort",
     saveConfigurationButton: "Konfiguration speichern",
-    selectConfiguration: "Konfiguration auswählen"
+    selectConfiguration: "Konfiguration auswählen",
+    apiKeyLabel: "API-Schlüssel",
+    callbackUrlLabel: "Callback-URL",
+    fiatPrecisionLabel: "Präzision",
+    batteryMaxVoltsLabel: "Batterie Max Volt",
+    batteryMinVoltsLabel: "Batterie Min Volt",
+    contrastLevelLabel: "Kontraststufe",
+    logLevelLabel: "Log-Level",
+    currencyLabel: "Währung"
   },
   fr: {
     loading: "Chargement...",
@@ -268,7 +284,15 @@ const translations = {
     fiatCurrencyLabel: "Devise",
     wifiPasswordLabel: "Mot de passe WiFi",
     saveConfigurationButton: "Enregistrer la configuration",
-    selectConfiguration: "Sélectionner la configuration"
+    selectConfiguration: "Sélectionner la configuration",
+    apiKeyLabel: "Clé API",
+    callbackUrlLabel: "URL de callback",
+    fiatPrecisionLabel: "Précision",
+    batteryMaxVoltsLabel: "Tension max batterie",
+    batteryMinVoltsLabel: "Tension min batterie",
+    contrastLevelLabel: "Niveau de contraste",
+    logLevelLabel: "Niveau de log",
+    currencyLabel: "Devise"
   },
   es: {
     loading: "Cargando...",
@@ -346,7 +370,15 @@ const translations = {
     fiatCurrencyLabel: "Moneda",
     wifiPasswordLabel: "Contraseña WiFi",
     saveConfigurationButton: "Guardar configuración",
-    selectConfiguration: "Seleccionar configuración"
+    selectConfiguration: "Seleccionar configuración",
+    apiKeyLabel: "Clave API",
+    callbackUrlLabel: "URL de callback",
+    fiatPrecisionLabel: "Precisión",
+    batteryMaxVoltsLabel: "Voltaje máx. batería",
+    batteryMinVoltsLabel: "Voltaje mín. batería",
+    contrastLevelLabel: "Nivel de contraste",
+    logLevelLabel: "Nivel de registro",
+    currencyLabel: "Moneda"
   },
   it: {
     loading: "Caricamento...",
@@ -424,7 +456,15 @@ const translations = {
     fiatCurrencyLabel: "Valuta",
     wifiPasswordLabel: "Password WiFi",
     saveConfigurationButton: "Salva configurazione",
-    selectConfiguration: "Seleziona configurazione"
+    selectConfiguration: "Seleziona configurazione",
+    apiKeyLabel: "Chiave API",
+    callbackUrlLabel: "URL di callback",
+    fiatPrecisionLabel: "Precisione",
+    batteryMaxVoltsLabel: "Tensione max batteria",
+    batteryMinVoltsLabel: "Tensione min batteria",
+    contrastLevelLabel: "Livello contrasto",
+    logLevelLabel: "Livello log",
+    currencyLabel: "Valuta"
   }
 };
 
@@ -825,49 +865,49 @@ export class EwtInstallDialog extends LitElement {
       </div>
       ${this._expertMode ? html`
         <div style="grid-column: 1;">
-          <label>API Key:</label>
+          <label>${getTranslation("apiKeyLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="apiKey.key" value="BueokH4o3FmhWmbvqyqLKz" />
         </div>
         <div style="grid-column: 1;">
-          <label>Callback URL:</label>
+          <label>${getTranslation("callbackUrlLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="callbackUrl" value="https://${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
         </div>
         <div style="grid-column: 1;">
-          <label>Fiat Precision:</label>
+          <label>${getTranslation("fiatPrecisionLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="fiatPrecision" value="2" />
         </div>
         <div style="grid-column: 1;">
-          <label>Battery Max Volts:</label>
+          <label>${getTranslation("batteryMaxVoltsLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="batteryMaxVolts" value="4.2" />
         </div>
         <div style="grid-column: 1;">
-          <label>Battery Min Volts:</label>
+          <label>${getTranslation("batteryMinVoltsLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="batteryMinVolts" value="3.3" />
         </div>
         <div style="grid-column: 1;">
-          <label>Contrast Level:</label>
+          <label>${getTranslation("contrastLevelLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="contrastLevel" value="75" />
         </div>
         <div style="grid-column: 1;">
-          <label>Log Level:</label>
+          <label>${getTranslation("logLevelLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="logLevel" value="info" />
         </div>
         <div style="grid-column: 1;">
-          <label>Fiat Currency:</label>
+          <label>${getTranslation("currencyLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <select id="fiatCurrency" name="fiatCurrency">
@@ -1015,8 +1055,7 @@ export class EwtInstallDialog extends LitElement {
     const checkbox = event.target as HTMLInputElement;
     
     if (checkbox.checked) {
-      // Show warning before enabling expert mode
-      if (confirm('Warning: Expert mode is only for advanced users connecting to non-OPAGO LNbits instances. Incorrect settings may cause the device to malfunction. Are you sure you want to continue?')) {
+      if (confirm(getTranslation("expertModeWarning", language))) {
         this._expertMode = true;
       } else {
         checkbox.checked = false;
@@ -1024,7 +1063,6 @@ export class EwtInstallDialog extends LitElement {
       }
     } else {
       this._expertMode = false;
-      // Reset fields when disabling expert mode
       this._resetConfigurationFields();
     }
     
