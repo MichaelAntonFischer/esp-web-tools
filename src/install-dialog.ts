@@ -1223,9 +1223,18 @@ export class EwtInstallDialog extends LitElement {
       ></ewt-page-message>
       <ewt-button
         slot="primaryAction"
-        label="Back to Dashboard"
-        @click=${() => {
-          this._state = "DASHBOARD";
+        label="Close"
+        @click=${async () => {
+          // Close the port
+          if (this.port) {
+            try {
+              await this.port.close();
+            } catch (e) {
+              console.error("Error closing port:", e);
+            }
+          }
+          // Close the dialog and remove it
+          this._handleClose();
         }}
       ></ewt-button>
     `;
