@@ -53,7 +53,8 @@ export class EwtInstallDialog extends LitElement {
     | "INSTALL"
     | "CONFIGURE"
     | "ASK_ERASE"
-    | "LOGS" = "DASHBOARD";
+    | "LOGS"
+    | "SUCCESS_MESSAGE" = "DASHBOARD";
 
   @state() private _installErase = false;
   @state() private _installConfirmed = false;
@@ -272,6 +273,8 @@ export class EwtInstallDialog extends LitElement {
       [heading, content, hideActions] = this._renderConfigure();
     } else if (this._state === "LOGS") {
       [heading, content, hideActions] = this._renderLogs();
+    } else if (this._state === "SUCCESS_MESSAGE") {
+      [heading, content, hideActions] = this._renderSuccessMessage();
     }
 
     return html`
@@ -777,8 +780,12 @@ export class EwtInstallDialog extends LitElement {
               for (const jsonResponse of jsonResponses) {
                 if (jsonResponse.id === "1" && jsonResponse.result === true) {
                   // Configuration saved successfully
-                  alert('Configuration saved successfully!');
-                  this._state = "DASHBOARD";
+                  this._state = "LOGS";
+                  const console = this.shadowRoot!.querySelector("ewt-console");
+                  if (console) {
+                    await console.reset();
+                  }
+                  this._state = "SUCCESS_MESSAGE";
                   return;
                 }
               }
@@ -791,7 +798,8 @@ export class EwtInstallDialog extends LitElement {
         }
       }
     } catch (e) {
-      alert(`Failed to save configuration: ${(e as Error).message}`);
+      this._state = "ERROR";
+      this._error = `Failed to save configuration: ${(e as Error).message}`;
     } finally {
       this.scanningSSIDs = false;
     }
@@ -1171,6 +1179,25 @@ export class EwtInstallDialog extends LitElement {
       }
     `,
     ];
+
+  private _renderSuccessMessage(): [string, TemplateResult, boolean] {
+    const heading = "Success";
+    const content = html`
+      <ewt-page-message
+        .icon=${"🎉"}
+        label="Configuration saved successfully!"
+      ></ewt-page-message>
+      <ewt-button
+        slot="primaryAction"
+        label="Back to Dashboard"
+        @click=${() => {
+          this._state = "DASHBOARD";
+        }}
+      ></ewt-button>
+    `;
+    const hideActions = false;
+    return [heading, content, hideActions];
+  }
 }
 
 if (!customElements.get('ewt-install-dialog')) {
