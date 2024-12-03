@@ -1515,28 +1515,32 @@ export class EwtInstallDialog extends LitElement {
     let content: TemplateResult;
     let hideActions = false;
 
+    // Initialize console synchronously first
     content = html`
-      ${this._initializeConsole().then(success => {
-        if (!success) {
-          return html`
-            <div class="error">
-              Failed to initialize console connection. Please try again.
-            </div>
-          `;
-        }
-        return html`<ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>`;
-      })}
+      <ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>
       <ewt-button
         slot="primaryAction"
         label=${getTranslation("back", language)}
         @click=${async () => {
           try {
+            // First disconnect console
             const console = this.shadowRoot!.querySelector("ewt-console");
             if (console) {
               await console.disconnect();
             }
+
+            // Give time for cleanup
             await sleep(500);
-            await this._initializeConsole();
+
+            // Ensure clean port state
+            try {
+              await this.port.close();
+              await sleep(100);
+              await this.port.open({ baudRate: 115200 });
+            } catch (e) {
+              window.console.error("Error resetting port:", e);
+            }
+
             this._state = "DASHBOARD";
             this._initialize();
           } catch (e) {
@@ -1573,7 +1577,20 @@ export class EwtInstallDialog extends LitElement {
       ></ewt-button>
     `;
 
-    return [heading, content!, hideActions];
+    // Initialize console when component is mounted
+    setTimeout(async () => {
+      try {
+        await this._initializeConsole();
+        const console = this.shadowRoot?.querySelector("ewt-console");
+        if (console) {
+          await console.connect();
+        }
+      } catch (e) {
+        window.console.error("Error initializing console:", e);
+      }
+    }, 0);
+
+    return [heading, content, hideActions];
   }
 
   public override willUpdate(changedProps: PropertyValues) {
