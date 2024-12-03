@@ -1153,39 +1153,56 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      // First ensure streams are released
+      // Close any existing connections and cleanup
       await this._releaseStreams();
+      
+      // Ensure any console is disconnected
+      const existingConsole = this.shadowRoot?.querySelector("ewt-console");
+      if (existingConsole) {
+        await existingConsole.disconnect();
+      }
 
-      // Add a small delay to ensure cleanup
+      // Close and reopen the port completely
+      try {
+        await this.port?.close();
+      } catch (e) {
+        console.log("Port was already closed");
+      }
+
+      // Wait a moment before reopening
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Then acquire fresh streams
-      await this._acquireStreams();
+      // Open fresh connection
+      await this.port?.open({ baudRate: 115200 });
+      
+      if (!this.port || !this.port.readable || !this.port.writable) {
+        throw new Error("Failed to initialize port");
+      }
 
-      // Send configuration
+      // Get fresh streams
+      const writer = this.port.writable.getWriter();
+      const reader = this.port.readable.getReader();
+
       try {
+        // Send configuration
         const encoder = new TextEncoder();
         const dataStr = JSON.stringify(data);
         window.console.log("Sending:", dataStr);
         const encodedData = encoder.encode(dataStr + "\n");
-        await this._currentWriter!.write(encodedData);
-      } catch (e) {
-        throw new Error("Failed to write configuration: " + e);
-      }
+        await writer.write(encodedData);
 
-      // Wait for confirmation
-      let configSaved = false;
-      let accumulatedChunk = '';
-      const decoder = new TextDecoder();
+        // Wait for confirmation
+        let configSaved = false;
+        let accumulatedChunk = '';
+        const decoder = new TextDecoder();
 
-      try {
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error("Timeout waiting for configuration confirmation")), 5000);
         });
 
         const readPromise = (async () => {
           while (!configSaved) {
-            const { value, done } = await this._currentReader!.read();
+            const { value, done } = await reader.read();
             if (done) break;
             
             const chunk = decoder.decode(value);
@@ -1206,7 +1223,7 @@ export class EwtInstallDialog extends LitElement {
                 params: {}
               };
               const resetEncoder = new TextEncoder();
-              await this._currentWriter!.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
+              await writer.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
               
               this._state = "SUCCESS_MESSAGE";
               break;
@@ -1216,9 +1233,19 @@ export class EwtInstallDialog extends LitElement {
 
         await Promise.race([readPromise, timeoutPromise]);
 
-      } catch (e) {
-        if (!configSaved) {
-          throw new Error("Failed to receive configuration confirmation: " + (e as Error).message);
+      } finally {
+        // Always release the streams
+        try {
+          await reader.cancel();
+          reader.releaseLock();
+        } catch (e) {
+          console.log("Error releasing reader:", e);
+        }
+        try {
+          await writer.close();
+          writer.releaseLock();
+        } catch (e) {
+          console.log("Error releasing writer:", e);
         }
       }
 
@@ -1226,7 +1253,6 @@ export class EwtInstallDialog extends LitElement {
       this._state = "ERROR";
       this._error = `Failed to save configuration: ${(e as Error).message}`;
     } finally {
-      await this._releaseStreams();
       this.scanningSSIDs = false;
     }
   }
