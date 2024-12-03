@@ -109,6 +109,13 @@ const translations = {
     createNewDeviceOption: "Create New Device",
     demoModeConfirmation: "Are you sure you want to put the device in Demo Mode?",
     connectionFailed: "Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com",
+    enterSSIDHere: "Enter SSID manually",
+    selectSSIDFirst: "--select SSID--",
+    titleLabel: "Title",
+    fiatCurrencyLabel: "Fiat Currency",
+    wifiPasswordLabel: "WiFi Password",
+    saveConfigurationButton: "Save Configuration",
+    selectConfiguration: "Select Configuration"
   },
   de: {
     loading: "Lädt...",
@@ -183,6 +190,13 @@ const translations = {
     createNewDeviceOption: "Neues Gerät erstellen",
     demoModeConfirmation: "Sind Sie sicher, dass Sie das Gerät in den Demo-Modus versetzen möchten?",
     connectionFailed: "API-Schlüssel konnten nicht abgerufen werden: Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut. Wenn das Problem weiterhin besteht, kontaktieren Sie support@opago-pay.com",
+    enterSSIDHere: "SSID manuell eingeben",
+    selectSSIDFirst: "--SSID auswählen--",
+    titleLabel: "Titel",
+    fiatCurrencyLabel: "Fiat-Währung",
+    wifiPasswordLabel: "WLAN-Passwort",
+    saveConfigurationButton: "Konfiguration speichern",
+    selectConfiguration: "Konfiguration auswählen"
   },
   fr: {
     loading: "Chargement...",
@@ -257,6 +271,13 @@ const translations = {
     createNewDeviceOption: "Créer un nouvel appareil",
     demoModeConfirmation: "Êtes-vous sûr de vouloir mettre l'appareil en mode démo ?",
     connectionFailed: "Échec de la récupération des clés API : Veuillez vérifier votre connexion Internet et réessayer. Si le problème persiste, contactez support@opago-pay.com",
+    enterSSIDHere: "Saisir le SSID manuellement",
+    selectSSIDFirst: "--sélectionner SSID--",
+    titleLabel: "Titre",
+    fiatCurrencyLabel: "Devise fiat",
+    wifiPasswordLabel: "Mot de passe WiFi",
+    saveConfigurationButton: "Enregistrer la configuration",
+    selectConfiguration: "Sélectionner la configuration"
   },
   es: {
     loading: "Cargando...",
@@ -331,6 +352,13 @@ const translations = {
     createNewDeviceOption: "Crear nuevo dispositivo",
     demoModeConfirmation: "¿Está seguro de que desea poner el dispositivo en modo demo?",
     connectionFailed: "Error al obtener las claves API: Por favor, compruebe su conexión a Internet e inténtelo de nuevo. Si el problema persiste, contacte con support@opago-pay.com",
+    enterSSIDHere: "Introducir SSID manualmente",
+    selectSSIDFirst: "--seleccionar SSID--",
+    titleLabel: "Título",
+    fiatCurrencyLabel: "Moneda fiat",
+    wifiPasswordLabel: "Contraseña WiFi",
+    saveConfigurationButton: "Guardar configuración",
+    selectConfiguration: "Seleccionar configuración"
   },
   it: {
     loading: "Caricamento...",
@@ -405,6 +433,13 @@ const translations = {
     createNewDeviceOption: "Crea nuovo dispositivo",
     demoModeConfirmation: "Sei sicuro di voler mettere il dispositivo in modalità demo?",
     connectionFailed: "Impossibile recuperare le chiavi API: Verifica la tua connessione Internet e riprova. Se il problema persiste, contatta support@opago-pay.com",
+    enterSSIDHere: "Inserisci SSID manualmente",
+    selectSSIDFirst: "--seleziona SSID--",
+    titleLabel: "Titolo",
+    fiatCurrencyLabel: "Valuta fiat",
+    wifiPasswordLabel: "Password WiFi",
+    saveConfigurationButton: "Salva configurazione",
+    selectConfiguration: "Seleziona configurazione"
   }
 };
 
@@ -856,7 +891,7 @@ export class EwtInstallDialog extends LitElement {
         </div>
       ` : html`
         <div style="grid-column: 1;">
-          <label>Select Device:</label>
+          <label>${getTranslation("selectConfiguration", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <select name="existingConfigs" @change=${this._handleConfigChange}>
@@ -867,13 +902,13 @@ export class EwtInstallDialog extends LitElement {
           </select>
         </div>
         <div style="grid-column: 1;" id="titleLabel" style="display: none;">
-          <label>Title:</label>
+          <label>${getTranslation("titleLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <input type="text" name="title" id="titleInput" style="display: none;" />
         </div>
         <div style="grid-column: 1;" id="currencyLabel" style="display: none;">
-          <label>Fiat Currency:</label>
+          <label>${getTranslation("fiatCurrencyLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
           <select id="fiatCurrency" name="fiatCurrency" style="display: none;">
@@ -883,18 +918,19 @@ export class EwtInstallDialog extends LitElement {
       `}
       <form id="configurationForm" style="display: grid; grid-template-columns: 1fr 20px 1fr;">
     <div style="grid-column: 1;">
-      <label>WiFi SSID:</label>
+      <label>${getTranslation("wifiSSID", language)}:</label>
     </div>
     <div style="grid-column: 3;">
       <select id="wifiSSID" name="wifiSSID" @click=${this._handleSSIDClick}>
-        <option value="">--select SSID--</option>
+        <option value="">${getTranslation("selectSSIDFirst", language)}</option>
         ${this.availableSSIDs.map(ssid => html`<option value="${ssid}">${ssid}</option>`)}
-        <option value="manual">Enter Manually</option>
+        <option value="manual">${getTranslation("enterManually", language)}</option>
       </select>
-      <input type="text" id="manualSSID" name="manualSSID" style="display:none;" placeholder="Enter SSID manually">
+      <input type="text" id="manualSSID" name="manualSSID" style="display:none;" 
+        placeholder=${getTranslation("enterSSIDHere", language)}>
     </div>
     <div style="grid-column: 1;">
-      <label>WiFi Password:</label>
+      <label>${getTranslation("wifiPasswordLabel", language)}:</label>
     </div>
     <div style="grid-column: 3;">
       <input type="text" name="wifiPwd" value="" />
@@ -902,7 +938,7 @@ export class EwtInstallDialog extends LitElement {
     </form>
     <ewt-button
       slot="primaryAction"
-      label="Save Configuration"
+      label=${getTranslation("saveConfigurationButton", language)}
       @click=${() => {
         this._saveConfiguration();
       }}
