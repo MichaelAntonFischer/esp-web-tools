@@ -44,7 +44,7 @@ export class EwtInstallDialog extends LitElement {
 
   private _expertMode: boolean = false;
 
-  private _manifest!: Manifest;
+  @state() private _manifest!: Manifest;
 
   @state() private _state:
     | "ERROR"
@@ -309,6 +309,10 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
+    if (!this._manifest) {
+      return ["Loading...", html`<div>Loading manifest...</div>`, true, false];
+    }
+
     const heading = "Device Dashboard";
     let content: TemplateResult;
     let hideActions = true;
@@ -720,6 +724,10 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderAskErase(): [string | undefined, TemplateResult] {
+    if (!this._manifest) {
+      return ["Loading...", html`<div>Loading manifest...</div>`];
+    }
+
     const heading = "Erase device";
     const content = html`
       <div>
@@ -750,6 +758,10 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderInstall(): [string | undefined, TemplateResult, boolean, boolean] {
+    if (!this._manifest) {
+      return ["Loading...", html`<div>Loading manifest...</div>`, true, false];
+    }
+
     let heading: string | undefined;
     let content: TemplateResult;
     let hideActions = false;
@@ -898,9 +910,9 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  protected override firstUpdated(changedProps: PropertyValues) {
+  protected override async firstUpdated(changedProps: PropertyValues) {
     super.firstUpdated(changedProps);
-    this._initialize();
+    await this._initialize();
   }
 
   protected override updated(changedProps: PropertyValues) {
@@ -926,6 +938,7 @@ export class EwtInstallDialog extends LitElement {
 
     try {
       this._manifest = await downloadManifest(this.manifestPath);
+      this.requestUpdate(); // Force update after manifest is loaded
     } catch (err: any) {
       this._state = "ERROR";
       this._error = "Failed to download manifest";
@@ -940,6 +953,12 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private _confirmInstall() {
+    if (!this._manifest) {
+      this._state = "ERROR";
+      this._error = "Manifest not loaded";
+      return;
+    }
+
     this._installConfirmed = true;
     this._installState = undefined;
   
@@ -1049,7 +1068,9 @@ export class EwtInstallDialog extends LitElement {
     ];
 }
 
-customElements.define("ewt-install-dialog", EwtInstallDialog);
+if (!customElements.get('ewt-install-dialog')) {
+  customElements.define("ewt-install-dialog", EwtInstallDialog);
+}
 
 declare global {
   interface HTMLElementTagNameMap {
