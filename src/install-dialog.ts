@@ -1589,7 +1589,7 @@ export class EwtInstallDialog extends LitElement {
             .then(() => this._initializeConsole())
             .catch(e => {
               window.console.error("Error cleaning up console:", e);
-            }));
+            });
         }
       }
 
