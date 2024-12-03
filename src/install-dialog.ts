@@ -382,10 +382,6 @@ export class EwtInstallDialog extends LitElement {
   private _lastScanTime = 0;
   private readonly SCAN_COOLDOWN = 5000; // 5 seconds between scans
 
-  private _currentReader?: ReadableStreamDefaultReader<Uint8Array>;
-  private _currentWriter?: WritableStreamDefaultWriter<Uint8Array>;
-  private _isPortLocked = false;
-
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
@@ -975,99 +971,6 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  private async _releaseStreams() {
-    try {
-      if (this._currentReader) {
-        try {
-          await this._currentReader.cancel();
-          this._currentReader.releaseLock();
-        } catch (e) {
-          console.log("Error releasing reader:", e);
-        }
-        this._currentReader = undefined;
-      }
-      
-      if (this._currentWriter) {
-        try {
-          await this._currentWriter.close();
-          this._currentWriter.releaseLock();
-        } catch (e) {
-          console.log("Error releasing writer:", e);
-        }
-        this._currentWriter = undefined;
-      }
-      
-      this._isPortLocked = false;
-    } catch (e) {
-      console.error("Error in _releaseStreams:", e);
-    }
-  }
-
-  private async _acquireStreams() {
-    if (this._isPortLocked) {
-      await this._releaseStreams();
-    }
-
-    // First, ensure any console component is disconnected
-    const existingConsole = this.shadowRoot?.querySelector("ewt-console");
-    if (existingConsole) {
-      try {
-        await existingConsole.disconnect();
-        // Give a small delay to ensure cleanup
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (e) {
-        console.log("Console disconnect error:", e);
-      }
-    }
-
-    // Then try to reopen the port if needed
-    if (!this.port || !this.port.readable || !this.port.writable) {
-      try {
-        await this.port?.close();
-      } catch (e) {
-        console.log("Port was already closed");
-      }
-      await this.port?.open({ baudRate: 115200 });
-      
-      if (!this.port || !this.port.readable || !this.port.writable) {
-        throw new Error("Failed to initialize port");
-      }
-    }
-
-    // Add additional checks for locked streams
-    try {
-      if (this.port.readable.locked) {
-        console.log("Readable stream is locked, attempting to force release");
-        try {
-          const reader = this.port.readable.getReader();
-          await reader.cancel();
-          reader.releaseLock();
-        } catch (e) {
-          console.log("Error forcing readable stream unlock:", e);
-        }
-      }
-      
-      if (this.port.writable.locked) {
-        console.log("Writable stream is locked, attempting to force release");
-        try {
-          const writer = this.port.writable.getWriter();
-          await writer.close();
-          writer.releaseLock();
-        } catch (e) {
-          console.log("Error forcing writable stream unlock:", e);
-        }
-      }
-
-      // Now try to acquire the streams
-      this._currentReader = this.port.readable.getReader();
-      this._currentWriter = this.port.writable.getWriter();
-      this._isPortLocked = true;
-    } catch (e) {
-      await this._releaseStreams();
-      throw new Error("Failed to acquire streams: " + e);
-    }
-  }
-
   private async _saveConfiguration() {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
@@ -1153,9 +1056,6 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      // Close any existing connections and cleanup
-      await this._releaseStreams();
-      
       // Ensure any console is disconnected
       const existingConsole = this.shadowRoot?.querySelector("ewt-console");
       if (existingConsole) {
@@ -1164,19 +1064,31 @@ export class EwtInstallDialog extends LitElement {
 
       // Close and reopen the port completely
       try {
-        await this.port?.close();
+        // Check if port exists and is open
+        if (this.port?.readable || this.port?.writable) {
+          await this.port.close();
+          // Wait a moment after closing
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       } catch (e) {
-        console.log("Port was already closed");
+        console.log("Port closing error:", e);
       }
 
-      // Wait a moment before reopening
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Open fresh connection
-      await this.port?.open({ baudRate: 115200 });
-      
-      if (!this.port || !this.port.readable || !this.port.writable) {
-        throw new Error("Failed to initialize port");
+      try {
+        // Only open if it's not already open
+        if (!this.port?.readable && !this.port?.writable) {
+          await this.port?.open({ baudRate: 115200 });
+        }
+        
+        // Wait a moment after opening
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (!this.port || !this.port.readable || !this.port.writable) {
+          throw new Error("Failed to initialize port");
+        }
+      } catch (e) {
+        console.error("Port opening error:", e);
+        throw new Error("Failed to open port: " + (e instanceof Error ? e.message : String(e)));
       }
 
       // Get fresh streams
@@ -1432,11 +1344,6 @@ export class EwtInstallDialog extends LitElement {
     if (changedProps.has("_state")) {
       this._resetScanningState();
       
-      // Clean up streams when changing states
-      if (this._state !== "CONFIGURE" && this._isPortLocked) {
-        this._releaseStreams();
-      }
-      
       // Disconnect console when leaving logs view
       if (changedProps.get("_state") === "LOGS") {
         const console = this.shadowRoot?.querySelector("ewt-console");
@@ -1540,8 +1447,6 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _handleClose() {
-    await this._releaseStreams();
-    
     if (this.port) {
       try {
         await this.port.close();
