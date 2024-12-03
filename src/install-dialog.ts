@@ -71,6 +71,9 @@ export class EwtInstallDialog extends LitElement {
 
   @property({ type: Boolean, reflect: true }) scanningSSIDs = false;
 
+  private _lastScanTime = 0;
+  private readonly SCAN_COOLDOWN = 5000; // 5 seconds between scans
+
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
@@ -93,7 +96,7 @@ export class EwtInstallDialog extends LitElement {
       this._existingConfigs = await response.json();
     } catch (error) {
       console.error('Error fetching configurations:', error);
-      alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
+      // alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
     }
   }
 
@@ -213,32 +216,38 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  private async _populateDropdownWithSSIDs() {
-    if (!this.scanningSSIDs) {
-      this.scanningSSIDs = true; // Set scanningSSIDs to true before starting the scan
-      try {
-        const response = await this._scanSSIDs();
-        if (response && response.result) {
-          const ssids = response.result; // Directly use the result array
-          console.log('Parsed SSIDs:', ssids);
+  private _resetScanningState() {
+    this.scanningSSIDs = false;
+    if (this._scanTimeout) {
+      clearTimeout(this._scanTimeout);
+    }
+  }
 
-          if (ssids.length > 0) {
-            this.availableSSIDs = Array.from(new Set([...this.availableSSIDs, ...ssids]));
-            console.log('Updated SSIDs:', this.availableSSIDs);
-            this.requestUpdate();
-          } else {
-            console.log('No new SSIDs found');
-          }
-        } else {
-          console.log('Response did not contain SSIDs:', response);
+  private _scanTimeout?: number;
+
+  private async _populateDropdownWithSSIDs() {
+    const now = Date.now();
+    if (this.scanningSSIDs || (now - this._lastScanTime < this.SCAN_COOLDOWN)) {
+      console.log("SSID scan skipped: too soon or already in progress");
+      return;
+    }
+
+    this.scanningSSIDs = true;
+    this._lastScanTime = now;
+
+    try {
+      const response = await this._scanSSIDs();
+      if (response?.result) {
+        const ssids = response.result;
+        if (ssids.length > 0) {
+          this.availableSSIDs = Array.from(new Set([...this.availableSSIDs, ...ssids]));
+          this.requestUpdate();
         }
-      } catch (error) {
-        console.error("Failed to process SSIDs:", error);
-      } finally {
-        this.scanningSSIDs = false; // Set scanningSSIDs to false after the scan is complete
       }
-    } else {
-      console.log("SSID scan is already in progress.");
+    } catch (error) {
+      console.error("Failed to process SSIDs:", error);
+    } finally {
+      this.scanningSSIDs = false;
     }
   }
 
@@ -505,11 +514,7 @@ export class EwtInstallDialog extends LitElement {
       slot="primaryAction"
       label="Save Configuration"
       @click=${() => {
-        if (this.scanningSSIDs) {
-          alert('SSID scan in progress. Please wait a moment before saving the configurations.');
-        } else {
-          this._saveConfiguration();
-        }
+        this._saveConfiguration();
       }}
     ></ewt-button>
   `;
@@ -531,13 +536,14 @@ export class EwtInstallDialog extends LitElement {
     // Write the data to the serial port
     if (this.port && this.port.writable) {
       const writer = this.port.writable.getWriter();
-      const encoder = new TextEncoder();
-      const dataStr = JSON.stringify(data) + "\n";
-      const encodedData = encoder.encode(dataStr);
-      await writer.write(encodedData);
-      writer.releaseLock();
-    } else {
-      throw new Error("Serial port is not open or writable");
+      try {
+        const encoder = new TextEncoder();
+        const dataStr = JSON.stringify(data) + "\n";
+        const encodedData = encoder.encode(dataStr);
+        await writer.write(encodedData);
+      } finally {
+        writer.releaseLock();
+      }
     }
   
     // Read the response from the serial port
@@ -545,40 +551,32 @@ export class EwtInstallDialog extends LitElement {
       const reader = this.port.readable.getReader();
       try {
         let completeData = '';
+        const decoder = new TextDecoder();
+        
         while (true) {
           const { value, done } = await reader.read();
-          if (done) {
-            break;
-          }
-          const textDecoder = new TextDecoder();
-          const chunk = textDecoder.decode(value, { stream: true });
-          completeData += chunk;
-  
-          // Check if the complete data contains one or more complete JSON responses
-          let jsonResponses = this.extractJsonResponses(completeData);
-          if (jsonResponses.length > 0) {
-            // Remove the parsed JSON responses from the complete data
-            completeData = completeData.slice(completeData.lastIndexOf('}') + 1);
-            
-            // Find the response that is different from the sent data
-            let response = jsonResponses.find(resp => JSON.stringify(resp) !== JSON.stringify(data));
-            if (response) {
-              console.log("Parsed JSON response:", response);
-              reader.releaseLock(); // Release the reader lock before returning
+          if (done) break;
+          
+          completeData += decoder.decode(value, { stream: true });
+          
+          // Check for complete JSON response
+          const responses = this.extractJsonResponses(completeData);
+          for (const response of responses) {
+            if (response.id === id && response.result) {
+              reader.releaseLock();
               return response;
             }
           }
         }
-        reader.releaseLock(); // Release the reader lock if no valid response is found
-        throw new Error("No valid JSON response received from the serial port");
       } catch (error) {
         console.error('Error reading from serial port:', error);
-        reader.releaseLock(); // Release the reader lock in case of an error
         throw error;
+      } finally {
+        reader.releaseLock();
       }
-    } else {
-      throw new Error("Serial port is not open or readable");
     }
+  
+    throw new Error("No valid response received");
   }
   
   private extractJsonResponses(data: string): any[] {
@@ -662,8 +660,6 @@ export class EwtInstallDialog extends LitElement {
     const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
     if (!form) return;
   
-    this.scanningSSIDs = true;
-
     let formData = new FormData(form);
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
@@ -676,9 +672,17 @@ export class EwtInstallDialog extends LitElement {
     delete object.expertMode;
     delete object.manualSSID;
   
+    // Prepare the data structure early
+    const data = {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "setconfig",
+      "params": object
+    };
+
     // If expert mode is enabled, write the data to json exactly as entered by the user
     if (this._expertMode) {
-      // No additional processing needed for expert mode
+      // Skip API key validation in expert mode
     } else {
       // Check if an existing configuration is selected
       if (object.existingConfigs !== 'createNewDevice') {
@@ -686,90 +690,83 @@ export class EwtInstallDialog extends LitElement {
         const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
   
         if (selectedConfig) {
-          // Replace the "existingConfigs" field with the "apiKey", "callbackUrl", and "currency" fields from the selected configuration
-          object['apiKey.key'] = selectedConfig.key;
-          object['callbackUrl'] = `https://${domain}/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
-          object['fiatCurrency'] = selectedConfig.currency;
-          object['fiatPrecision'] = '2';
-          object['batteryMaxVolts'] = '4.2';
-          object['batteryMinVolts'] = '3.3';
-          object['contrastLevel'] = '75';
-          object['logLevel'] = 'info';
+          // Replace fields with selected configuration
+          data.params['apiKey.key'] = selectedConfig.key;
+          data.params['callbackUrl'] = `https://${domain}/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
+          data.params['fiatCurrency'] = selectedConfig.currency;
+          data.params['fiatPrecision'] = '2';
+          data.params['batteryMaxVolts'] = '4.2';
+          data.params['batteryMinVolts'] = '3.3';
+          data.params['contrastLevel'] = '75';
+          data.params['logLevel'] = 'info';
   
-          // Remove the "existingConfigs" and "title" field
-          delete object.existingConfigs;
-          delete object.title;
+          delete data.params.existingConfigs;
+          delete data.params.title;
         }
       }
   
       // Check if "Create New Device" is selected
       if (object.existingConfigs === 'createNewDevice') {
-        // Here we should call _createNewDevice method and update the form data accordingly
         const newDevice = await this._createNewDevice();
         
         if (newDevice) {
-          object['apiKey.key'] = newDevice.apiKey;
-          object['callbackUrl'] = newDevice.callbackUrl;
-          object['fiatPrecision'] = '2';
-          object['batteryMaxVolts'] = '4.2';
-          object['batteryMinVolts'] = '3.3';
-          object['contrastLevel'] = '75';
-          object['logLevel'] = 'info';
+          data.params['apiKey.key'] = newDevice.apiKey;
+          data.params['callbackUrl'] = newDevice.callbackUrl;
+          data.params['fiatPrecision'] = '2';
+          data.params['batteryMaxVolts'] = '4.2';
+          data.params['batteryMinVolts'] = '3.3';
+          data.params['contrastLevel'] = '75';
+          data.params['logLevel'] = 'info';
       
-          // Remove the "existingConfigs" and "title" field
-          delete object.existingConfigs;
-          delete object.title;
+          delete data.params.existingConfigs;
+          delete data.params.title;
         }
       }
   
-      if (object['fiatCurrency'] === 'sat') {
-        object['fiatPrecision'] = '0';
+      if (data.params['fiatCurrency'] === 'sat') {
+        data.params['fiatPrecision'] = '0';
       }
-    }
   
-    // Prepare the data to be sent
-    const data = {
-      "jsonrpc": "2.0",
-      "id": "1",
-      "method": "setconfig",
-      "params": object
-    };
-    // Check if the API key or callback url are blank
-    if (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz') {
-      alert('Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
-      return;
-    }
-    
-    // Check if the API key or callback url are for demo mode
-    if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
-      if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
-        return;
+      // Check if the API key or callback url are blank or default (only in non-expert mode)
+      if (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz') {
+        // alert('Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
+        // return;
+      }
+      
+      if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
+        if (!confirm('Are you sure you want to put the device in Demo Mode?')) {
+          return;
+        }
       }
     }
+
     // Send the configuration to the ESP32 via JSON-RPC
     try {
       if (!this.port || this.port.readable === null || this.port.writable === null) {
         this.port = await navigator.serial.requestPort();
         await this.port.open({ baudRate: 115200 });
       }
-  
+
       if (this.port.writable) {
         const writer = this.port.writable.getWriter();
-        const encoder = new TextEncoder();
-        const dataStr = JSON.stringify(data);
-        console.log("Sending:", dataStr);  // log data before sending
-        const encodedData = encoder.encode(dataStr + "\n"); // add newline character at the end
-        await writer.write(encodedData);
-        writer.releaseLock();
-      } else {
-        console.error('The port is not writable');
-      } 
-      this.scanningSSIDs = false; 
+        try {
+          const encoder = new TextEncoder();
+          const dataStr = JSON.stringify(data);
+          console.log("Sending:", dataStr);
+          const encodedData = encoder.encode(dataStr + "\n");
+          await writer.write(encodedData);
+        } finally {
+          writer.releaseLock();
+        }
+      }
+
       // Output the progress to a console-style window
       this._state = "LOGS";
       this.logger.log(`Configuration saved successfully.`);
     } catch (e) {
       this.logger.error(`There was an error saving the configuration: ${(e as Error).message}`);
+    } finally {
+      this.scanningSSIDs = false;
     }
   }
 
@@ -915,7 +912,10 @@ export class EwtInstallDialog extends LitElement {
         slot="primaryAction"
         label="Back"
         @click=${async () => {
-          await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
+          const console = this.shadowRoot!.querySelector("ewt-console");
+          if (console) {
+            await console.disconnect();
+          }
           this._state = "DASHBOARD";
           this._initialize();
         }}
@@ -924,19 +924,21 @@ export class EwtInstallDialog extends LitElement {
         slot="secondaryAction"
         label="Download Logs"
         @click=${() => {
-          textDownload(
-            this.shadowRoot!.querySelector("ewt-console")!.logs(),
-            `esp-web-tools-logs.txt`,
-          );
-
-          this.shadowRoot!.querySelector("ewt-console")!.reset();
+          const console = this.shadowRoot!.querySelector("ewt-console");
+          if (console) {
+            textDownload(console.logs(), `esp-web-tools-logs.txt`);
+            console.reset();
+          }
         }}
       ></ewt-button>
       <ewt-button
         slot="secondaryAction"
         label="Reset Device"
         @click=${async () => {
-          await this.shadowRoot!.querySelector("ewt-console")!.reset();
+          const console = this.shadowRoot!.querySelector("ewt-console");
+          if (console) {
+            await console.reset();
+          }
         }}
       ></ewt-button>
     `;
@@ -945,18 +947,26 @@ export class EwtInstallDialog extends LitElement {
   }
 
   public override willUpdate(changedProps: PropertyValues) {
-    if (!changedProps.has("_state")) {
-      return;
-    }
-    // Clear errors when changing between pages unless we change
-    // to the error page.
-    if (this._state !== "ERROR") {
-      this._error = undefined;
-    }
+    if (changedProps.has("_state")) {
+      this._resetScanningState();
+      
+      // Disconnect console when leaving logs view
+      if (changedProps.get("_state") === "LOGS") {
+        const console = this.shadowRoot?.querySelector("ewt-console");
+        if (console) {
+          console.disconnect();
+        }
+      }
 
-    if (this._state === "INSTALL") {
-      this._installConfirmed = false;
-      this._installState = undefined;
+      // Existing state change handling
+      if (this._state !== "ERROR") {
+        this._error = undefined;
+      }
+
+      if (this._state === "INSTALL") {
+        this._installConfirmed = false;
+        this._installState = undefined;
+      }
     }
   }
 
@@ -1043,6 +1053,24 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _handleClose() {
+    try {
+      if (this.port.readable) {
+        const reader = this.port.readable.getReader();
+        try {
+          await reader.cancel();
+        } finally {
+          reader.releaseLock();
+        }
+      }
+    } catch (e) {
+      console.error("Error cleaning up streams:", e);
+    }
+    
+    this.scanningSSIDs = false;
+    if (this._scanTimeout) {
+      clearTimeout(this._scanTimeout);
+    }
+    
     fireEvent(this, "closed" as any);
     this.parentNode!.removeChild(this);
   }
