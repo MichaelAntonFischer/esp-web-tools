@@ -96,7 +96,7 @@ export class EwtInstallDialog extends LitElement {
       this._existingConfigs = await response.json();
     } catch (error) {
       console.error('Error fetching configurations:', error);
-      // alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
+      alert('Connection to the server failed. Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
     }
   }
 
