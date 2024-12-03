@@ -1433,46 +1433,86 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content!, hideActions, allowClosing];
   }
 
+  private async _initializeConsole() {
+    try {
+      // First ensure any existing streams are released
+      if (this.port.readable?.locked || this.port.writable?.locked) {
+        try {
+          if (this.port.readable?.locked) {
+            const reader = this.port.readable.getReader();
+            await reader.cancel();
+            reader.releaseLock();
+          }
+          if (this.port.writable?.locked) {
+            const writer = this.port.writable.getWriter();
+            await writer.close();
+            writer.releaseLock();
+          }
+        } catch (e) {
+          window.console.log("Stream cleanup error:", e);
+        }
+      }
+
+      // Close and reopen port
+      try {
+        await this.port.close();
+      } catch (e) {
+        window.console.log("Port was already closed");
+      }
+
+      await sleep(500);
+
+      try {
+        await this.port.open({ baudRate: 115200 });
+        await sleep(500);
+      } catch (e) {
+        window.console.error("Failed to open port:", e);
+        throw new Error("Failed to initialize console connection");
+      }
+
+      // Verify port is ready
+      if (!this.port.readable || !this.port.writable) {
+        throw new Error("Port is not properly initialized");
+      }
+
+      return true;
+    } catch (e) {
+      window.console.error("Console initialization error:", e);
+      return false;
+    }
+  }
+
   _renderLogs(): [string | undefined, TemplateResult, boolean] {
     let heading: string | undefined = getTranslation("logs", language);
     let content: TemplateResult;
     let hideActions = false;
 
     content = html`
-      <ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>
+      ${this._initializeConsole().then(success => {
+        if (!success) {
+          return html`
+            <div class="error">
+              Failed to initialize console connection. Please try again.
+            </div>
+          `;
+        }
+        return html`<ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>`;
+      })}
       <ewt-button
         slot="primaryAction"
         label=${getTranslation("back", language)}
         @click=${async () => {
           try {
-            // First disconnect console
             const console = this.shadowRoot!.querySelector("ewt-console");
             if (console) {
               await console.disconnect();
             }
-
-            // Give time for cleanup
-            await sleep(100);
-
-            // Close and reopen port
-            try {
-              await this.port.close();
-            } catch (e) {
-              window.console.log("Port was already closed");
-            }
-
-            await sleep(100);
-            
-            await this.port.open({ baudRate: 115200 });
-            
-            // Wait for port to be ready
-            await sleep(100);
-
+            await sleep(500);
+            await this._initializeConsole();
             this._state = "DASHBOARD";
             this._initialize();
           } catch (e) {
             window.console.error("Error cleaning up console:", e);
-            // Try to recover
             this._state = "DASHBOARD";
             this._initialize();
           }
@@ -1516,12 +1556,9 @@ export class EwtInstallDialog extends LitElement {
       if (changedProps.get("_state") === "LOGS") {
         const console = this.shadowRoot?.querySelector("ewt-console");
         if (console) {
-          // First disconnect console
           console.disconnect()
-            .then(() => sleep(100))
-            .then(() => this.port.close())
-            .then(() => sleep(100))
-            .then(() => this.port.open({ baudRate: 115200 }))
+            .then(() => sleep(500))
+            .then(() => this._initializeConsole())
             .catch(e => {
               window.console.error("Error cleaning up console:", e);
             });
