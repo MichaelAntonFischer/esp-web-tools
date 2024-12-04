@@ -1531,9 +1531,6 @@ export class EwtInstallDialog extends LitElement {
             // Give time for cleanup
             await sleep(500);
 
-            // Ensure clean port state and release any locked streams
-            await this._ensureUnlockedStreams();
-
             // Close port and installer
             if (this.port) {
               try {
@@ -1542,6 +1539,7 @@ export class EwtInstallDialog extends LitElement {
                 window.console.error("Error closing port:", e);
               }
             }
+            // Use _handleClose to properly clean up and remove the dialog
             this._handleClose();
           } catch (e) {
             window.console.error("Error cleaning up console:", e);
@@ -1617,8 +1615,6 @@ export class EwtInstallDialog extends LitElement {
         if (console) {
           console.disconnect()
             .then(() => sleep(500))
-            .then(() => this._ensureUnlockedStreams())
-            .then(() => sleep(100))
             .catch(e => {
               window.console.error("Error cleaning up console:", e);
             });
