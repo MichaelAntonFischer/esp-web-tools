@@ -1114,27 +1114,7 @@ export class EwtInstallDialog extends LitElement {
         await sleep(100);
       }
 
-      // Force release any locked streams
-      if (this.port.readable?.locked) {
-        try {
-          const reader = this.port.readable.getReader();
-          await reader.cancel();
-          reader.releaseLock();
-        } catch (e) {
-          window.console.log("Error releasing reader:", e);
-        }
-      }
-      if (this.port.writable?.locked) {
-        try {
-          const writer = this.port.writable.getWriter();
-          await writer.close();
-          writer.releaseLock();
-        } catch (e) {
-          window.console.log("Error releasing writer:", e);
-        }
-      }
-
-      // Close and reopen port
+      // Close port first to ensure clean state
       try {
         await this.port.close();
       } catch (e) {
@@ -1142,12 +1122,14 @@ export class EwtInstallDialog extends LitElement {
       }
 
       await sleep(500);
+
+      // Open fresh port connection
       await this.port.open({ baudRate: 115200 });
       await sleep(500);
 
-      // Verify streams are unlocked and ready
-      if (this.port.readable?.locked || this.port.writable?.locked) {
-        throw new Error("Streams are still locked after reset");
+      // Now streams should be fresh and unlocked
+      if (!this.port?.readable || !this.port?.writable) {
+        throw new Error("Port streams not available after reset");
       }
 
       return true;
@@ -1242,32 +1224,25 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      // Ensure streams are unlocked before proceeding
+      // Reset port state first
       const streamsReady = await this._ensureUnlockedStreams();
       if (!streamsReady) {
         throw new Error("Failed to prepare streams for configuration");
       }
 
-      // Verify streams are available
-      if (!this.port?.writable || !this.port?.readable) {
-        throw new Error("Serial port streams are not available");
-      }
-
       // Get fresh streams
-      const writer = this.port.writable.getWriter();
-      const reader = this.port.readable.getReader();
+      const writer = this.port.writable!.getWriter();
+      const reader = this.port.readable!.getReader();
 
       try {
         // Send configuration
         const encoder = new TextEncoder();
         const dataStr = JSON.stringify(data);
         window.console.log("Sending:", dataStr);
-        const encodedData = encoder.encode(dataStr + "\n");
-        await writer.write(encodedData);
+        await writer.write(encoder.encode(dataStr + "\n"));
 
         // Wait for confirmation
         let configSaved = false;
-        let accumulatedChunk = '';
         const decoder = new TextDecoder();
 
         const timeoutPromise = new Promise((_, reject) => {
@@ -1275,18 +1250,17 @@ export class EwtInstallDialog extends LitElement {
         });
 
         const readPromise = (async () => {
+          let buffer = '';
           while (!configSaved) {
             const { value, done } = await reader.read();
             if (done) break;
             
-            const chunk = decoder.decode(value);
-            console.log("Received:", chunk);
-            
-            accumulatedChunk += chunk;
-            
-            if (accumulatedChunk.includes("[info] Configurations saved successfully") || 
-                (accumulatedChunk.includes("[info] Saving") && 
-                 accumulatedChunk.includes("[info] JSON-RPC command received: setconfig"))) {
+            buffer += decoder.decode(value, { stream: true });
+            window.console.log("Received:", buffer);
+
+            if (buffer.includes("[info] Configurations saved successfully") || 
+                (buffer.includes("[info] Saving") && 
+                 buffer.includes("[info] JSON-RPC command received: setconfig"))) {
               configSaved = true;
               
               // Send restart command
@@ -1296,9 +1270,7 @@ export class EwtInstallDialog extends LitElement {
                 method: "restart",
                 params: {}
               };
-              const resetEncoder = new TextEncoder();
-              await writer.write(resetEncoder.encode(JSON.stringify(resetCmd) + "\n"));
-              
+              await writer.write(encoder.encode(JSON.stringify(resetCmd) + "\n"));
               this._state = "SUCCESS_MESSAGE";
               break;
             }
@@ -1308,19 +1280,9 @@ export class EwtInstallDialog extends LitElement {
         await Promise.race([readPromise, timeoutPromise]);
 
       } finally {
-        // Always release the streams
-        try {
-          await reader.cancel();
-          reader.releaseLock();
-        } catch (e) {
-          window.console.log("Error releasing reader:", e);
-        }
-        try {
-          await writer.close();
-          writer.releaseLock();
-        } catch (e) {
-          window.console.log("Error releasing writer:", e);
-        }
+        // Release streams in finally block
+        reader.releaseLock();
+        writer.releaseLock();
       }
 
     } catch (e) {
@@ -1621,7 +1583,7 @@ export class EwtInstallDialog extends LitElement {
             .then(() => sleep(100))
             .catch(e => {
               window.console.error("Error cleaning up console:", e);
-            });
+            }));
         }
       }
 
