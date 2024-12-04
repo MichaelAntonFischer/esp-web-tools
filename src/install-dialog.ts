@@ -874,7 +874,7 @@ export class EwtInstallDialog extends LitElement {
           <label>${getTranslation("callbackUrlLabel", language)}:</label>
         </div>
         <div style="grid-column: 3;">
-          <input type="text" name="callbackUrl" value="https://${domain}/lnurldevice/api/v1/lnurl/hTUMG" />
+          <input type="text" name="callbackUrl" value="https://opago-pay.com/getstarted" />
         </div>
         <div style="grid-column: 1;">
           <label>${getTranslation("fiatPrecisionLabel", language)}:</label>
