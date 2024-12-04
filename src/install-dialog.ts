@@ -1114,20 +1114,39 @@ export class EwtInstallDialog extends LitElement {
         await sleep(100);
       }
 
-      // Close port first to ensure clean state
+      // Check if port is already open
+      let needsReopen = true;
       try {
-        await this.port.close();
+        const info = await this.port.getInfo();
+        if (info) {
+          // Port is already open, just verify streams
+          if (this.port.readable && this.port.writable && 
+              !this.port.readable.locked && !this.port.writable.locked) {
+            needsReopen = false;
+          }
+        }
       } catch (e) {
-        window.console.log("Port was already closed");
+        // Port might be closed, which is fine
       }
 
-      await sleep(500);
+      if (needsReopen) {
+        try {
+          await this.port.close();
+          await sleep(500);
+        } catch (e) {
+          window.console.log("Port was already closed");
+        }
 
-      // Open fresh port connection
-      await this.port.open({ baudRate: 115200 });
-      await sleep(500);
+        try {
+          await this.port.open({ baudRate: 115200 });
+          await sleep(500);
+        } catch (e) {
+          window.console.error("Failed to open port:", e);
+          throw e;
+        }
+      }
 
-      // Now streams should be fresh and unlocked
+      // Verify streams are available
       if (!this.port?.readable || !this.port?.writable) {
         throw new Error("Port streams not available after reset");
       }
@@ -1583,7 +1602,7 @@ export class EwtInstallDialog extends LitElement {
             .then(() => sleep(100))
             .catch(e => {
               window.console.error("Error cleaning up console:", e);
-            }));
+            });
         }
       }
 
