@@ -517,6 +517,75 @@ export class EwtInstallDialog extends LitElement {
   private _lastScanTime = 0;
   private readonly SCAN_COOLDOWN = 5000; // 5 seconds between scans
 
+  // Add this as a class property to track port state
+  private _portBusy = false;
+  private _currentOperation: string | null = null;
+
+  private async _acquirePort(operation: string): Promise<boolean> {
+    if (this._portBusy) {
+      window.console.log(`Port busy with ${this._currentOperation}, cannot start ${operation}`);
+      return false;
+    }
+
+    try {
+      this._portBusy = true;
+      this._currentOperation = operation;
+
+      // Always start with a clean slate
+      try {
+        if (this.port.readable?.locked || this.port.writable?.locked) {
+          await this.port.close();
+          await sleep(500);
+        }
+      } catch (e) {
+        window.console.log("Port was already closed");
+      }
+
+      await this.port.open({ baudRate: 115200 });
+      await sleep(500);
+
+      if (!this.port?.readable || !this.port?.writable) {
+        throw new Error("Port not properly initialized");
+      }
+
+      return true;
+    } catch (e) {
+      window.console.error(`Failed to acquire port for ${operation}:`, e);
+      this._portBusy = false;
+      this._currentOperation = null;
+      return false;
+    }
+  }
+
+  private async _releasePort() {
+    try {
+      // First try to release any locked streams
+      if (this.port.readable?.locked) {
+        const reader = this.port.readable.getReader();
+        await reader.cancel();
+        reader.releaseLock();
+      }
+      if (this.port.writable?.locked) {
+        const writer = this.port.writable.getWriter();
+        await writer.close();
+        writer.releaseLock();
+      }
+
+      await this.port.close();
+      await sleep(500);
+    } catch (e) {
+      window.console.error("Error releasing port:", e);
+    } finally {
+      this._portBusy = false;
+      this._currentOperation = null;
+    }
+  }
+
+  // Replace _ensureUnlockedStreams with this simpler version
+  private async _ensureUnlockedStreams(): Promise<boolean> {
+    return this._acquirePort("stream_reset");
+  }
+
   // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
@@ -1105,148 +1174,95 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  private async _ensureUnlockedStreams() {
+  private async _saveConfiguration() {
+    if (!await this._acquirePort("save_config")) {
+      this._state = "ERROR";
+      this._error = "Device busy, try again in a moment";
+      return;
+    }
+
     try {
-      // First ensure any console is disconnected
-      const existingConsole = this.shadowRoot?.querySelector("ewt-console");
-      if (existingConsole) {
-        await existingConsole.disconnect();
-        await sleep(100);
+      const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
+      if (!form) return;
+    
+      let formData = new FormData(form);
+      let object: any = {};
+      formData.forEach((value, key) => { object[key] = value });
+
+      // Check if manual SSID should be used
+      if (object.wifiSSID === 'manual' && object.manualSSID) {
+        object.wifiSSID = object.manualSSID;
       }
 
-      // Check if port is already open
-      let needsReopen = true;
-      try {
-        const info = await this.port.getInfo();
-        if (info) {
-          // Port is already open, just verify streams
-          if (this.port.readable && this.port.writable && 
-              !this.port.readable.locked && !this.port.writable.locked) {
-            needsReopen = false;
+      delete object.expertMode;
+      delete object.manualSSID;
+    
+      // Prepare the data structure early
+      const data = {
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": "setconfig",
+        "params": object
+      };
+
+      // If expert mode is enabled, write the data to json exactly as entered by the user
+      if (this._expertMode) {
+        // Skip API key validation in expert mode
+      } else {
+        // Check if an existing configuration is selected
+        if (object.existingConfigs !== 'createNewDevice') {
+          // Find the selected configuration
+          const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
+    
+          if (selectedConfig) {
+            // Replace fields with selected configuration
+            data.params['apiKey.key'] = selectedConfig.key;
+            data.params['callbackUrl'] = `https://${domain}/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
+            data.params['fiatCurrency'] = selectedConfig.currency;
+            data.params['fiatPrecision'] = '2';
+            data.params['batteryMaxVolts'] = '4.2';
+            data.params['batteryMinVolts'] = '3.3';
+            data.params['contrastLevel'] = '75';
+            data.params['logLevel'] = 'info';
+    
+            delete data.params.existingConfigs;
+            delete data.params.title;
           }
         }
-      } catch (e) {
-        // Port might be closed, which is fine
-      }
-
-      if (needsReopen) {
-        try {
-          await this.port.close();
-          await sleep(500);
-        } catch (e) {
-          window.console.log("Port was already closed");
-        }
-
-        try {
-          await this.port.open({ baudRate: 115200 });
-          await sleep(500);
-        } catch (e) {
-          window.console.error("Failed to open port:", e);
-          throw e;
-        }
-      }
-
-      // Verify streams are available
-      if (!this.port?.readable || !this.port?.writable) {
-        throw new Error("Port streams not available after reset");
-      }
-
-      return true;
-    } catch (e) {
-      window.console.error("Error ensuring unlocked streams:", e);
-      return false;
-    }
-  }
-
-  private async _saveConfiguration() {
-    const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
-    if (!form) return;
-  
-    let formData = new FormData(form);
-    let object: any = {};
-    formData.forEach((value, key) => { object[key] = value });
-
-    // Check if manual SSID should be used
-    if (object.wifiSSID === 'manual' && object.manualSSID) {
-      object.wifiSSID = object.manualSSID;
-    }
-
-    delete object.expertMode;
-    delete object.manualSSID;
-  
-    // Prepare the data structure early
-    const data = {
-      "jsonrpc": "2.0",
-      "id": "1",
-      "method": "setconfig",
-      "params": object
-    };
-
-    // If expert mode is enabled, write the data to json exactly as entered by the user
-    if (this._expertMode) {
-      // Skip API key validation in expert mode
-    } else {
-      // Check if an existing configuration is selected
-      if (object.existingConfigs !== 'createNewDevice') {
-        // Find the selected configuration
-        const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
-  
-        if (selectedConfig) {
-          // Replace fields with selected configuration
-          data.params['apiKey.key'] = selectedConfig.key;
-          data.params['callbackUrl'] = `https://${domain}/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
-          data.params['fiatCurrency'] = selectedConfig.currency;
-          data.params['fiatPrecision'] = '2';
-          data.params['batteryMaxVolts'] = '4.2';
-          data.params['batteryMinVolts'] = '3.3';
-          data.params['contrastLevel'] = '75';
-          data.params['logLevel'] = 'info';
-  
-          delete data.params.existingConfigs;
-          delete data.params.title;
-        }
-      }
-  
-      // Check if "Create New Device" is selected
-      if (object.existingConfigs === 'createNewDevice') {
-        const newDevice = await this._createNewDevice();
+    
+        // Check if "Create New Device" is selected
+        if (object.existingConfigs === 'createNewDevice') {
+          const newDevice = await this._createNewDevice();
+          
+          if (newDevice) {
+            data.params['apiKey.key'] = newDevice.apiKey;
+            data.params['callbackUrl'] = newDevice.callbackUrl;
+            data.params['fiatPrecision'] = '2';
+            data.params['batteryMaxVolts'] = '4.2';
+            data.params['batteryMinVolts'] = '3.3';
+            data.params['contrastLevel'] = '75';
+            data.params['logLevel'] = 'info';
         
-        if (newDevice) {
-          data.params['apiKey.key'] = newDevice.apiKey;
-          data.params['callbackUrl'] = newDevice.callbackUrl;
-          data.params['fiatPrecision'] = '2';
-          data.params['batteryMaxVolts'] = '4.2';
-          data.params['batteryMinVolts'] = '3.3';
-          data.params['contrastLevel'] = '75';
-          data.params['logLevel'] = 'info';
-      
-          delete data.params.existingConfigs;
-          delete data.params.title;
+            delete data.params.existingConfigs;
+            delete data.params.title;
+          }
         }
-      }
-  
-      if (data.params['fiatCurrency'] === 'sat') {
-        data.params['fiatPrecision'] = '0';
-      }
-  
-      // Check if the API key or callback url are blank or default (only in non-expert mode)
-      if (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz') {
-        // alert('Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
-        // return;
-      }
-      
-      if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
-        if (!confirm(getTranslation("demoModeConfirmation", language))) {
-          return;
+    
+        if (data.params['fiatCurrency'] === 'sat') {
+          data.params['fiatPrecision'] = '0';
         }
-      }
-    }
-
-    try {
-      // Reset port state first
-      const streamsReady = await this._ensureUnlockedStreams();
-      if (!streamsReady) {
-        throw new Error("Failed to prepare streams for configuration");
+    
+        // Check if the API key or callback url are blank or default (only in non-expert mode)
+        if (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz') {
+          // alert('Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
+          // return;
+        }
+        
+        if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
+          if (!confirm(getTranslation("demoModeConfirmation", language))) {
+            return;
+          }
+        }
       }
 
       // Get fresh streams
@@ -1308,7 +1324,7 @@ export class EwtInstallDialog extends LitElement {
       this._state = "ERROR";
       this._error = `Failed to save configuration: ${(e as Error).message}`;
     } finally {
-      this.scanningSSIDs = false;
+      await this._releasePort();
     }
   }
 
@@ -1443,52 +1459,7 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _initializeConsole() {
-    try {
-      // First ensure any existing streams are released
-      if (this.port.readable?.locked || this.port.writable?.locked) {
-        try {
-          if (this.port.readable?.locked) {
-            const reader = this.port.readable.getReader();
-            await reader.cancel();
-            reader.releaseLock();
-          }
-          if (this.port.writable?.locked) {
-            const writer = this.port.writable.getWriter();
-            await writer.close();
-            writer.releaseLock();
-          }
-        } catch (e) {
-          window.console.log("Stream cleanup error:", e);
-        }
-      }
-
-      // Close and reopen port
-      try {
-        await this.port.close();
-      } catch (e) {
-        window.console.log("Port was already closed");
-      }
-
-      await sleep(500);
-
-      try {
-        await this.port.open({ baudRate: 115200 });
-        await sleep(500);
-      } catch (e) {
-        window.console.error("Failed to open port:", e);
-        throw new Error("Failed to initialize console connection");
-      }
-
-      // Verify port is ready
-      if (!this.port.readable || !this.port.writable) {
-        throw new Error("Port is not properly initialized");
-      }
-
-      return true;
-    } catch (e) {
-      window.console.error("Console initialization error:", e);
-      return false;
-    }
+    return this._acquirePort("console");
   }
 
   _renderLogs(): [string | undefined, TemplateResult, boolean] {
@@ -1588,29 +1559,37 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions];
   }
 
-  public override willUpdate(changedProps: PropertyValues) {
+  public override async willUpdate(changedProps: PropertyValues) {
     if (changedProps.has("_state")) {
       this._resetScanningState();
       
-      // Handle console cleanup when leaving logs view
+      // Handle state transitions
       if (changedProps.get("_state") === "LOGS") {
         const console = this.shadowRoot?.querySelector("ewt-console");
         if (console) {
-          console.disconnect()
-            .then(() => sleep(500))
-            .then(() => this._ensureUnlockedStreams())
-            .then(() => sleep(100))
-            .catch(e => {
-              window.console.error("Error cleaning up console:", e);
-            });
+          await console.disconnect();
+          await this._releasePort();
         }
       }
 
-      // Existing state change handling
+      // Ensure clean port state for new state
+      if (this._state === "CONFIGURE") {
+        const acquired = await this._acquirePort("configure");
+        if (!acquired) {
+          this._state = "ERROR";
+          this._error = "Failed to prepare device for configuration";
+          return;
+        }
+        this._fetchCurrencies();
+        this._ensureSSIDsAreUpdated();
+      }
+
+      // Reset error state
       if (this._state !== "ERROR") {
         this._error = undefined;
       }
 
+      // Reset install state
       if (this._state === "INSTALL") {
         this._installConfirmed = false;
         this._installState = undefined;
