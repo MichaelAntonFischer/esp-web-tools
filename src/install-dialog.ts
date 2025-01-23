@@ -581,12 +581,105 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  // Replace _ensureUnlockedStreams with this simpler version
+  // Replace the existing _ensureUnlockedStreams method with this simpler version
   private async _ensureUnlockedStreams(): Promise<boolean> {
-    return this._acquirePort("stream_reset");
+    try {
+      // Close port first
+      try {
+        await this.port.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+
+      // Wait a bit
+      await sleep(100);
+
+      // Open fresh port connection
+      await this.port.open({ baudRate: 115200 });
+      await sleep(100);
+
+      // Verify we have working streams
+      if (!this.port?.readable || !this.port?.writable) {
+        throw new Error("Port streams not available");
+      }
+
+      return true;
+    } catch (e) {
+      window.console.error("Error resetting port:", e);
+      return false;
+    }
   }
 
-  // Hardcoded currencies with EUR, USD, CHF at the beginning and also in their alphabetical place
+  // Update the _saveConfiguration method to handle streams more reliably
+  private async _saveConfiguration() {
+    try {
+      // Get form data and prepare configuration first
+      const form = this.shadowRoot?.querySelector('#configurationForm') as HTMLFormElement;
+      if (!form) return;
+    
+      let formData = new FormData(form);
+      let object: any = {};
+      formData.forEach((value, key) => { object[key] = value });
+
+      // Process form data...
+      // ... existing form processing code ...
+
+      // Reset port to get fresh streams
+      if (!await this._ensureUnlockedStreams()) {
+        throw new Error("Failed to prepare device");
+      }
+
+      // Get fresh streams
+      const writer = this.port.writable!.getWriter();
+      const reader = this.port.readable!.getReader();
+
+      try {
+        // Send configuration
+        const encoder = new TextEncoder();
+        const dataStr = JSON.stringify(data) + "\n";
+        await writer.write(encoder.encode(dataStr));
+
+        // Wait for response
+        let configSaved = false;
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (!configSaved) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          
+          if (buffer.includes("[info] Configurations saved successfully") || 
+              (buffer.includes("[info] Saving") && 
+               buffer.includes("[info] JSON-RPC command received: setconfig"))) {
+            configSaved = true;
+            
+            // Send restart command
+            const resetCmd = {
+              jsonrpc: "2.0",
+              id: "2",
+              method: "restart",
+              params: {}
+            };
+            await writer.write(encoder.encode(JSON.stringify(resetCmd) + "\n"));
+            this._state = "SUCCESS_MESSAGE";
+            break;
+          }
+        }
+
+      } finally {
+        // Always release streams
+        reader.releaseLock();
+        writer.releaseLock();
+      }
+
+    } catch (e) {
+      this._state = "ERROR";
+      this._error = `Failed to save configuration: ${(e as Error).message}`;
+    }
+  }
+
   private async _fetchCurrencies() {
     this._currencies = ["EUR", "USD", "CHF", "sat", "AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BYR","BZD","CAD","CDF","CHF","CLF","CLP","CNH","CNY","COP","CRC","CUC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GGP","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HRK","HTG","HUF","IDR","ILS","IMP","INR","IQD","IRT","ISK","JEP","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRO","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLL","SOS","SRD","SSP","STD","SVC","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","UYU","UZS","VEF","VES","VND","VUV","WST","XAF","XAG","XAU","XCD","XDR","XOF","XPD","XPF","XPT","YER","ZAR","ZMW","ZWL"];
   }
@@ -1574,7 +1667,7 @@ export class EwtInstallDialog extends LitElement {
 
       // Ensure clean port state for new state
       if (this._state === "CONFIGURE") {
-        const acquired = await this._acquirePort("configure");
+        const acquired = await this._ensureUnlockedStreams();
         if (!acquired) {
           this._state = "ERROR";
           this._error = "Failed to prepare device for configuration";
