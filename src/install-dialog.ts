@@ -524,11 +524,13 @@ export class EwtInstallDialog extends LitElement {
 
   private async _fetchConfigs() {
     try {
-      const response = await fetch(`https://${domain}/lnpos/api/v1/lnurlpos?api-key=${api_key}`, {
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (api_key) headers['X-API-KEY'] = api_key;
+      const response = await fetch(`https://${domain}/lnpos/api/v1`, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers,
       });
 
       if (!response.ok) {
@@ -600,24 +602,18 @@ export class EwtInstallDialog extends LitElement {
       "title": title,
       "wallet": wallet,
       "currency": currency,
-      "device": "pos",
-      "profit": 0,
-      "switches": [
-        {
-          "amount": 0,
-          "duration": 0,
-          "pin": 0,
-          "lnurl": ""
-        }
-      ]
+      "profit": 0
     };
   
-    const response = await fetch(`https://${domain}/lnpos/api/v1/lnurlpos?api-key=${api_key}`, {
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    if (api_key) headers['X-API-KEY'] = api_key;
+  
+    const response = await fetch(`https://${domain}/lnpos/api/v1`, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify(data)
     });
   
