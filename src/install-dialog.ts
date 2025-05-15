@@ -30,7 +30,7 @@ console.log(
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
-const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago-pay.com' : 'api.opago-pay.com';
+const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago-pay.com' : 'api.opago.com';
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 const language = document.body.dataset.language || 'en';
@@ -524,7 +524,7 @@ export class EwtInstallDialog extends LitElement {
 
   private async _fetchConfigs() {
     try {
-      const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+      const response = await fetch(`https://${domain}/lnpos/api/v1/lnurlpos?api-key=${api_key}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -612,7 +612,7 @@ export class EwtInstallDialog extends LitElement {
       ]
     };
   
-    const response = await fetch(`https://${domain}/lnurldevice/api/v1/lnurlpos?api-key=${api_key}`, {
+    const response = await fetch(`https://${domain}/lnpos/api/v1/lnurlpos?api-key=${api_key}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -633,7 +633,7 @@ export class EwtInstallDialog extends LitElement {
   // Once the new device is created, return an object with the necessary properties
   return {
     apiKey: newDevice.key, // replace 'apiKey' with the actual property name for the API key in the newDevice object
-    callbackUrl: `https://${domain}/lnurldevice/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    callbackUrl: `https://${domain}/lnpos/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
   };
 }
 
@@ -1105,55 +1105,54 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
-  private async _ensureUnlockedStreams() {
+  private async _ensureUnlockedStreams(): Promise<boolean> {
     try {
-      // First ensure any console is disconnected
-      const existingConsole = this.shadowRoot?.querySelector("ewt-console");
-      if (existingConsole) {
-        await existingConsole.disconnect();
+      // First try to release any existing locks
+      if (this.port.readable?.locked || this.port.writable?.locked) {
+        try {
+          if (this.port.readable?.locked) {
+            const reader = this.port.readable.getReader();
+            await reader.cancel();
+            reader.releaseLock();
+          }
+          if (this.port.writable?.locked) {
+            const writer = this.port.writable.getWriter();
+            await writer.close();
+            writer.releaseLock();
+          }
+        } catch (e) {
+          console.log("Stream cleanup error:", e);
+        }
+        
+        // Brief pause after cleanup
         await sleep(100);
       }
 
-      // Check if port is already open
-      let needsReopen = true;
+      // Close and reopen port
       try {
-        const info = await this.port.getInfo();
-        if (info) {
-          // Port is already open, just verify streams
-          if (this.port.readable && this.port.writable && 
-              !this.port.readable.locked && !this.port.writable.locked) {
-            needsReopen = false;
-          }
-        }
+        await this.port.close();
       } catch (e) {
-        // Port might be closed, which is fine
+        console.log("Port was already closed");
       }
 
-      if (needsReopen) {
-        try {
-          await this.port.close();
-          await sleep(500);
-        } catch (e) {
-          window.console.log("Port was already closed");
-        }
+      await sleep(500);
 
-        try {
-          await this.port.open({ baudRate: 115200 });
-          await sleep(500);
-        } catch (e) {
-          window.console.error("Failed to open port:", e);
-          throw e;
-        }
+      try {
+        await this.port.open({ baudRate: 115200 });
+        await sleep(500);
+      } catch (e) {
+        console.error("Failed to open port:", e);
+        throw new Error(getTranslation("connectionError", language));
       }
 
-      // Verify streams are available
-      if (!this.port?.readable || !this.port?.writable) {
-        throw new Error("Port streams not available after reset");
+      // Verify port is ready
+      if (!this.port.readable || !this.port.writable) {
+        throw new Error(getTranslation("connectionError", language));
       }
 
       return true;
     } catch (e) {
-      window.console.error("Error ensuring unlocked streams:", e);
+      console.error("Stream reset error:", e);
       return false;
     }
   }
@@ -1166,7 +1165,7 @@ export class EwtInstallDialog extends LitElement {
     let object: any = {};
     formData.forEach((value, key) => { object[key] = value });
 
-    // Check if manual SSID should be used
+    // Handle SSID selection
     if (object.wifiSSID === 'manual' && object.manualSSID) {
       object.wifiSSID = object.manualSSID;
     }
@@ -1174,7 +1173,7 @@ export class EwtInstallDialog extends LitElement {
     delete object.expertMode;
     delete object.manualSSID;
   
-    // Prepare the data structure early
+    // Prepare the data structure
     const data = {
       "jsonrpc": "2.0",
       "id": "1",
@@ -1182,133 +1181,121 @@ export class EwtInstallDialog extends LitElement {
       "params": object
     };
 
-    // If expert mode is enabled, write the data to json exactly as entered by the user
-    if (this._expertMode) {
-      // Skip API key validation in expert mode
-    } else {
-      // Check if an existing configuration is selected
+    // Handle expert mode vs normal mode configuration
+    if (!this._expertMode) {
+      // Process normal mode configuration
       if (object.existingConfigs !== 'createNewDevice') {
-        // Find the selected configuration
         const selectedConfig = this._existingConfigs.find(config => config.id === object.existingConfigs);
-  
         if (selectedConfig) {
-          // Replace fields with selected configuration
-          data.params['apiKey.key'] = selectedConfig.key;
-          data.params['callbackUrl'] = `https://${domain}/lnurldevice/api/v1/lnurl/${selectedConfig.id}`;
-          data.params['fiatCurrency'] = selectedConfig.currency;
-          data.params['fiatPrecision'] = '2';
-          data.params['batteryMaxVolts'] = '4.2';
-          data.params['batteryMinVolts'] = '3.3';
-          data.params['contrastLevel'] = '75';
-          data.params['logLevel'] = 'info';
-  
-          delete data.params.existingConfigs;
-          delete data.params.title;
+          Object.assign(data.params, {
+            'apiKey.key': selectedConfig.key,
+            'callbackUrl': `https://${domain}/lnpos/api/v1/lnurl/${selectedConfig.id}`,
+            'fiatCurrency': selectedConfig.currency,
+            'fiatPrecision': '2',
+            'batteryMaxVolts': '4.2',
+            'batteryMinVolts': '3.3',
+            'contrastLevel': '75',
+            'logLevel': 'info'
+          });
         }
-      }
-  
-      // Check if "Create New Device" is selected
-      if (object.existingConfigs === 'createNewDevice') {
-        const newDevice = await this._createNewDevice();
-        
-        if (newDevice) {
-          data.params['apiKey.key'] = newDevice.apiKey;
-          data.params['callbackUrl'] = newDevice.callbackUrl;
-          data.params['fiatPrecision'] = '2';
-          data.params['batteryMaxVolts'] = '4.2';
-          data.params['batteryMinVolts'] = '3.3';
-          data.params['contrastLevel'] = '75';
-          data.params['logLevel'] = 'info';
-      
-          delete data.params.existingConfigs;
-          delete data.params.title;
-        }
-      }
-  
-      if (data.params['fiatCurrency'] === 'sat') {
-        data.params['fiatPrecision'] = '0';
-      }
-  
-      // Check if the API key or callback url are blank or default (only in non-expert mode)
-      if (!data.params['apiKey.key'] || !data.params['callbackUrl'] || data.params['apiKey.key'] === 'BueokH4o3FmhWmbvqyqLKz') {
-        // alert('Fetching API keys Failed: Please check your internet connection and try again. If the problem reappears, contact support@opago-pay.com');
-        // return;
-      }
-      
-      if (data.params['callbackUrl'] === 'https://opago-pay.com/getstarted') {
-        if (!confirm(getTranslation("demoModeConfirmation", language))) {
+      } else {
+        try {
+          const newDevice = await this._createNewDevice();
+          if (newDevice) {
+            Object.assign(data.params, {
+              'apiKey.key': newDevice.apiKey,
+              'callbackUrl': newDevice.callbackUrl,
+              'fiatPrecision': '2',
+              'batteryMaxVolts': '4.2',
+              'batteryMinVolts': '3.3',
+              'contrastLevel': '75',
+              'logLevel': 'info'
+            });
+          }
+        } catch (error) {
+          this._state = "ERROR";
+          this._error = getTranslation("connectionFailed", language);
           return;
         }
       }
+
+      // Adjust precision for sat currency
+      if (data.params['fiatCurrency'] === 'sat') {
+        data.params['fiatPrecision'] = '0';
+      }
+
+      // Clean up form fields
+      delete data.params.existingConfigs;
+      delete data.params.title;
     }
 
     try {
-      // Reset port state first
+      // Ensure clean stream state
       const streamsReady = await this._ensureUnlockedStreams();
       if (!streamsReady) {
-        throw new Error("Failed to prepare streams for configuration");
+        throw new Error(getTranslation("connectionError", language));
       }
 
-      // Get fresh streams
+      // Get writer and reader
       const writer = this.port.writable!.getWriter();
       const reader = this.port.readable!.getReader();
 
       try {
-        // Send configuration
+        // Send configuration with proper line ending
         const encoder = new TextEncoder();
-        const dataStr = JSON.stringify(data);
-        window.console.log("Sending:", dataStr);
-        await writer.write(encoder.encode(dataStr + "\n"));
+        const configStr = JSON.stringify(data) + "\n";
+        await writer.write(encoder.encode(configStr));
 
-        // Wait for confirmation
-        let configSaved = false;
+        // Wait for response with timeout
         const decoder = new TextDecoder();
+        let buffer = '';
+        let configSaved = false;
+        
+        const timeoutMs = 5000;
+        const startTime = Date.now();
 
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Timeout waiting for configuration confirmation")), 5000);
-        });
+        while (!configSaved && (Date.now() - startTime) < timeoutMs) {
+          const { value, done } = await reader.read();
+          if (done) break;
 
-        const readPromise = (async () => {
-          let buffer = '';
-          while (!configSaved) {
-            const { value, done } = await reader.read();
-            if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          
+          if (buffer.includes("[info] Configurations saved successfully") || 
+              buffer.includes("[info] Saving") && 
+              buffer.includes("[info] JSON-RPC command received: setconfig")) {
+            configSaved = true;
             
-            buffer += decoder.decode(value, { stream: true });
-            window.console.log("Received:", buffer);
-
-            if (buffer.includes("[info] Configurations saved successfully") || 
-                (buffer.includes("[info] Saving") && 
-                 buffer.includes("[info] JSON-RPC command received: setconfig"))) {
-              configSaved = true;
-              
-              // Send restart command
-              const resetCmd = {
-                jsonrpc: "2.0",
-                id: "2",
-                method: "restart",
-                params: {}
-              };
-              await writer.write(encoder.encode(JSON.stringify(resetCmd) + "\n"));
-              this._state = "SUCCESS_MESSAGE";
-              break;
-            }
+            // Send restart command
+            const resetCmd = {
+              jsonrpc: "2.0",
+              id: "2",
+              method: "restart",
+              params: {}
+            };
+            await writer.write(encoder.encode(JSON.stringify(resetCmd) + "\n"));
+            
+            // Wait briefly for restart to begin
+            await sleep(500);
+            
+            this._state = "SUCCESS_MESSAGE";
+            break;
           }
-        })();
+        }
 
-        await Promise.race([readPromise, timeoutPromise]);
+        if (!configSaved) {
+          throw new Error("Configuration save timeout");
+        }
 
       } finally {
-        // Release streams in finally block
-        reader.releaseLock();
+        // Always release locks
         writer.releaseLock();
+        reader.releaseLock();
       }
 
-    } catch (e) {
+    } catch (error) {
+      console.error("Configuration save error:", error);
       this._state = "ERROR";
-      this._error = `Failed to save configuration: ${(e as Error).message}`;
-    } finally {
-      this.scanningSSIDs = false;
+      this._error = `${getTranslation("error", language)}: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
 
