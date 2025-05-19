@@ -30,7 +30,14 @@ console.log(
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
-const domain = window.location.hostname.includes('devdashboard') ? 'devapi.opago-pay.com' : 'api.opago.com';
+const lnbitsDomain = window.location.hostname.includes('devdashboard')
+  ? 'devlnbits.opago-pay.com'
+  : 'lnbits.opago.com';
+
+const apiDomain = window.location.hostname.includes('devdashboard')
+  ? 'devapi.opago-pay.com'
+  : 'api.opago.com';
+
 const api_key = document.body.dataset.apiKey;
 const wallet = document.body.dataset.wallet;
 const language = document.body.dataset.language || 'en';
@@ -541,7 +548,7 @@ export class EwtInstallDialog extends LitElement {
         'Accept': 'application/json',
       };
       if (api_key) headers['X-API-KEY'] = api_key;
-      const response = await fetch(`https://${domain}/lnpos/api/v1`, {
+      const response = await fetch(`https://${lnbitsDomain}/lnpos/api/v1`, {
         method: 'GET',
         headers,
         mode: 'cors',
@@ -625,7 +632,7 @@ export class EwtInstallDialog extends LitElement {
     };
     if (api_key) headers['X-API-KEY'] = api_key;
   
-    const response = await fetch(`https://${domain}/lnpos/api/v1`, {
+    const response = await fetch(`https://${lnbitsDomain}/lnpos/api/v1`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data),
@@ -644,7 +651,7 @@ export class EwtInstallDialog extends LitElement {
   // Once the new device is created, return an object with the necessary properties
   return {
     apiKey: newDevice.key, // replace 'apiKey' with the actual property name for the API key in the newDevice object
-    callbackUrl: `https://${domain}/lnpos/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
+    callbackUrl: `https://${apiDomain}/lnpos/api/v1/lnurl/${newDevice.id}`, // replace 'id' with the actual property name for the ID in the newDevice object
   };
 }
 
@@ -1189,7 +1196,7 @@ export class EwtInstallDialog extends LitElement {
         if (selectedConfig) {
           Object.assign(data.params, {
             'apiKey.key': selectedConfig.key,
-            'callbackUrl': `https://${domain}/lnpos/api/v1/lnurl/${selectedConfig.id}`,
+            'callbackUrl': `https://${apiDomain}/lnpos/api/v1/lnurl/${selectedConfig.id}`,
             'fiatCurrency': selectedConfig.currency,
             'fiatPrecision': '2',
             'batteryMaxVolts': '4.2',
