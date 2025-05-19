@@ -476,6 +476,19 @@ function getTranslation(key: keyof typeof translations.en, userLanguage: string 
   return translations[language]?.[key] || translations.en[key] || key;
 }
 
+// Utility for safe stream lock release
+async function safeReleaseLock(lock: any) {
+  if (!lock) return;
+  try {
+    if (typeof lock.cancel === 'function') {
+      await lock.cancel();
+    }
+  } catch (e) {}
+  try {
+    lock.releaseLock();
+  } catch (e) {}
+}
+
 @customElement('ewt-install-dialog')
 export class EwtInstallDialog extends LitElement {
   public port!: SerialPort;
@@ -531,6 +544,7 @@ export class EwtInstallDialog extends LitElement {
       const response = await fetch(`https://${domain}/lnpos/api/v1`, {
         method: 'GET',
         headers,
+        mode: 'cors',
       });
 
       if (!response.ok) {
@@ -614,7 +628,8 @@ export class EwtInstallDialog extends LitElement {
     const response = await fetch(`https://${domain}/lnpos/api/v1`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      mode: 'cors',
     });
   
     if (!response.ok) {
@@ -989,7 +1004,7 @@ export class EwtInstallDialog extends LitElement {
         const encodedData = encoder.encode(dataStr);
         await writer.write(encodedData);
       } finally {
-        writer.releaseLock();
+        await safeReleaseLock(writer);
       }
     }
   
@@ -1010,7 +1025,7 @@ export class EwtInstallDialog extends LitElement {
           const responses = this.extractJsonResponses(completeData);
           for (const response of responses) {
             if (response.id === id && response.result) {
-              reader.releaseLock();
+              await safeReleaseLock(reader);
               return response;
             }
           }
@@ -1019,7 +1034,7 @@ export class EwtInstallDialog extends LitElement {
         console.error('Error reading from serial port:', error);
         throw error;
       } finally {
-        reader.releaseLock();
+        await safeReleaseLock(reader);
       }
     }
   
@@ -1103,36 +1118,28 @@ export class EwtInstallDialog extends LitElement {
 
   private async _ensureUnlockedStreams(): Promise<boolean> {
     try {
-      // First try to release any existing locks
       if (this.port.readable?.locked || this.port.writable?.locked) {
         try {
           if (this.port.readable?.locked) {
             const reader = this.port.readable.getReader();
-            await reader.cancel();
-            reader.releaseLock();
+            await safeReleaseLock(reader);
           }
           if (this.port.writable?.locked) {
             const writer = this.port.writable.getWriter();
-            await writer.close();
-            writer.releaseLock();
+            try { await writer.close(); } catch (e) {}
+            await safeReleaseLock(writer);
           }
         } catch (e) {
           console.log("Stream cleanup error:", e);
         }
-        
-        // Brief pause after cleanup
         await sleep(100);
       }
-
-      // Close and reopen port
       try {
         await this.port.close();
       } catch (e) {
         console.log("Port was already closed");
       }
-
       await sleep(500);
-
       try {
         await this.port.open({ baudRate: 115200 });
         await sleep(500);
@@ -1140,12 +1147,9 @@ export class EwtInstallDialog extends LitElement {
         console.error("Failed to open port:", e);
         throw new Error(getTranslation("connectionError", language));
       }
-
-      // Verify port is ready
       if (!this.port.readable || !this.port.writable) {
         throw new Error(getTranslation("connectionError", language));
       }
-
       return true;
     } catch (e) {
       console.error("Stream reset error:", e);
@@ -1284,8 +1288,8 @@ export class EwtInstallDialog extends LitElement {
 
       } finally {
         // Always release locks
-        writer.releaseLock();
-        reader.releaseLock();
+        await safeReleaseLock(writer);
+        await safeReleaseLock(reader);
       }
 
     } catch (error) {
@@ -1427,33 +1431,27 @@ export class EwtInstallDialog extends LitElement {
 
   private async _initializeConsole() {
     try {
-      // First ensure any existing streams are released
       if (this.port.readable?.locked || this.port.writable?.locked) {
         try {
           if (this.port.readable?.locked) {
             const reader = this.port.readable.getReader();
-            await reader.cancel();
-            reader.releaseLock();
+            await safeReleaseLock(reader);
           }
           if (this.port.writable?.locked) {
             const writer = this.port.writable.getWriter();
-            await writer.close();
-            writer.releaseLock();
+            try { await writer.close(); } catch (e) {}
+            await safeReleaseLock(writer);
           }
         } catch (e) {
           window.console.log("Stream cleanup error:", e);
         }
       }
-
-      // Close and reopen port
       try {
         await this.port.close();
       } catch (e) {
         window.console.log("Port was already closed");
       }
-
       await sleep(500);
-
       try {
         await this.port.open({ baudRate: 115200 });
         await sleep(500);
@@ -1461,12 +1459,9 @@ export class EwtInstallDialog extends LitElement {
         window.console.error("Failed to open port:", e);
         throw new Error("Failed to initialize console connection");
       }
-
-      // Verify port is ready
       if (!this.port.readable || !this.port.writable) {
         throw new Error("Port is not properly initialized");
       }
-
       return true;
     } catch (e) {
       window.console.error("Console initialization error:", e);
@@ -1669,13 +1664,12 @@ export class EwtInstallDialog extends LitElement {
                 // First try to release any locked streams
                 if (this.port.readable?.locked) {
                   const reader = this.port.readable.getReader();
-                  await reader.cancel();
-                  reader.releaseLock();
+                  await safeReleaseLock(reader);
                 }
                 if (this.port.writable?.locked) {
                   const writer = this.port.writable.getWriter();
-                  await writer.close();
-                  writer.releaseLock();
+                  try { await writer.close(); } catch (e) {}
+                  await safeReleaseLock(writer);
                 }
 
                 await this.port.close();
@@ -1716,13 +1710,12 @@ export class EwtInstallDialog extends LitElement {
               // Same cleanup process for error state
               if (this.port.readable?.locked) {
                 const reader = this.port.readable.getReader();
-                await reader.cancel();
-                reader.releaseLock();
+                await safeReleaseLock(reader);
               }
               if (this.port.writable?.locked) {
                 const writer = this.port.writable.getWriter();
-                await writer.close();
-                writer.releaseLock();
+                try { await writer.close(); } catch (e) {}
+                await safeReleaseLock(writer);
               }
 
               await this.port.close();
